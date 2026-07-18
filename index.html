@@ -1020,6 +1020,34 @@ body{
   box-shadow:0 6px 18px rgba(0,0,0,.45);
 }
 #charBar.hidden{display:none;}
+
+/* ---------- BARRA DE CONFIRMAÇÃO DE COLOCAÇÃO (Colocar / Cancelar) ---------- */
+#placeConfirmBar{
+  position:absolute;
+  bottom:120px; left:50%;
+  transform:translateX(-50%);
+  display:flex;
+  gap:12px;
+  z-index:31;
+}
+#placeConfirmBar.hidden{display:none;}
+.placeBtn{
+  font-family:inherit;
+  font-weight:bold;
+  font-size:15px;
+  padding:12px 22px;
+  border-radius:10px;
+  cursor:pointer;
+  border:2px solid #000;
+  box-shadow:0 6px 18px rgba(0,0,0,.5);
+  transition:transform .1s, filter .15s;
+}
+.placeBtn:active{transform:scale(.95);}
+.placeBtn.confirm{background:var(--accent-2);color:#062;border-color:#0b3;}
+.placeBtn.confirm:hover{filter:brightness(1.1);}
+.placeBtn.cancel{background:var(--danger);color:#fff;border-color:#7a2018;}
+.placeBtn.cancel:hover{filter:brightness(1.1);}
+
 .charSlot{
   width:74px; height:84px;
   border-radius:10px;
@@ -1091,6 +1119,30 @@ body{
 }
 #invBtn:hover{filter:brightness(1.2);transform:translateY(-2px);}
 #invBtn.hidden{display:none;}
+
+/* ---------- BOTÃO DE VELOCIDADE RÁPIDA (aparece no lugar do inventário durante a partida) ---------- */
+#speedBtn{
+  position:absolute;
+  bottom:14px; right:14px;
+  width:48px; height:48px;
+  font-size:22px;
+  border:1px solid #000;
+  border-radius:12px;
+  background:var(--panel);
+  color:var(--ink);
+  cursor:pointer;
+  z-index:29;
+  box-shadow:0 6px 18px rgba(0,0,0,.45);
+  transition:transform .1s, filter .15s, background .15s, color .15s;
+}
+#speedBtn:hover{filter:brightness(1.2);transform:translateY(-2px);}
+#speedBtn.hidden{display:none;}
+/* Estado "rápido" ativo: destaca-se em dourado */
+#speedBtn.active{
+  background:var(--accent);
+  color:#1a1208;
+  box-shadow:0 0 14px rgba(224,169,59,.8), 0 6px 18px rgba(0,0,0,.45);
+}
 
 /* ---------- BOTÃO DE ENGRENAGEM ---------- */
 #gearBtn{
@@ -1218,6 +1270,10 @@ body{
   .charSlot .cost{ font-size:10px; }
   .charSlot .count{ font-size:9px; }
 
+  /* Barra de confirmação mais próxima da barra de personagens compacta */
+  #placeConfirmBar{ bottom:92px; gap:8px; }
+  .placeBtn{ font-size:13px; padding:11px 16px; }
+
   /* Botões genéricos dos ecrãs de menu: alvo de toque maior */
   .btn{ padding:13px 24px; font-size:15px; }
   .btn.ghost.small{ padding:9px 14px; font-size:12px; }
@@ -1277,6 +1333,13 @@ body{
   <!-- Dica de posicionamento (mapa limpo, sem overlay) -->
   <div id="prepHint" class="hidden">Clica fora do caminho para posicionar o teu personagem</div>
 
+  <!-- Barra de confirmação de colocação (toque): aparece por cima da barra de personagens
+       quando se escolhe um local, com as opções "Colocar" e "Cancelar" -->
+  <div id="placeConfirmBar" class="hidden">
+    <button id="placeConfirmBtn" class="placeBtn confirm">✔ Colocar</button>
+    <button id="placeCancelBtn" class="placeBtn cancel">✕ Cancelar</button>
+  </div>
+
   <!-- Mensagem da Kailany (chamada do "amor") — aparece em baixo durante 10s -->
   <div id="kailanyMsg" class="hidden">amor, vem ca me ajudar</div>
 
@@ -1284,6 +1347,8 @@ body{
   <div id="charBar"></div>
   <!-- Ícone de inventário (abre a escolha de personagens/ataques) -->
   <button id="invBtn" title="Inventário de personagens">🎒</button>
+  <!-- Botão de velocidade rápida (aparece no lugar do inventário durante a partida) -->
+  <button id="speedBtn" class="hidden" title="Velocidade rápida (igual à tecla ESPAÇO)">⏩</button>
   <!-- Botão de engrenagem (definições da partida) -->
   <button id="gearBtn" title="Definições">⚙️</button>
 
@@ -1479,6 +1544,10 @@ const prepHint    = $('#prepHint');
 const kailanyMsg  = $('#kailanyMsg');
 const charBar     = $('#charBar');
 const invBtn      = $('#invBtn');
+const speedBtn        = $('#speedBtn');
+const placeConfirmBar = $('#placeConfirmBar');
+const placeConfirmBtn = $('#placeConfirmBtn');
+const placeCancelBtn  = $('#placeCancelBtn');
 const boss60Overlay = $('#boss60Overlay');
 const boss60Circle  = $('#boss60Circle');
 const boss60Text    = $('#boss60Text');
@@ -8505,6 +8574,8 @@ const MurasakiRange = RangeSystem;
 const HeroSystem = {
   ghost:null,          // pré-visualização durante a colocação
   placing:false,       // está em modo de colocação?
+  confirming:false,    // já escolheu um local e está à espera de Colocar/Cancelar?
+  pendingSpot:null,    // {xPct,yPct} do local escolhido, à espera de confirmação
 
   // Verifica se um ponto (em %) está SOBRE o caminho (zona proibida)
   isOnPath(xPct, yPct){
@@ -8550,19 +8621,23 @@ const HeroSystem = {
     this.placing = true;
     game.style.cursor = 'crosshair';
     game.addEventListener('mousemove', this._move);
-    game.addEventListener('click', this._place, true); // captura antes do clique de seleção
+    game.addEventListener('click', this._selectSpot, true); // captura antes do clique de seleção
   },
   disablePlacement(){
     this.placing = false;
+    this.confirming = false;
+    this.pendingSpot = null;
     game.style.cursor = 'default';
     game.removeEventListener('mousemove', this._move);
-    game.removeEventListener('click', this._place, true);
+    game.removeEventListener('click', this._selectSpot, true);
     if(this.ghost){ this.ghost.remove(); this.ghost = null; }
     MurasakiRange.removeGhostRing();
+    placeConfirmBar.classList.add('hidden');
   },
 
   // Mostra o "fantasma" a seguir o rato (apenas em posições válidas)
   _move(e){
+    if(HeroSystem.confirming) return;   // já escolheu local: fantasma fica congelado até Colocar/Cancelar
     const r = game.getBoundingClientRect();
     const xPct = (e.clientX - r.left)/r.width*100;
     const yPct = (e.clientY - r.top)/r.height*100;
@@ -8597,6 +8672,69 @@ const HeroSystem = {
     } else {
       MurasakiRange.hideGhostRing();
     }
+  },
+
+  // Toca/clica num local válido: congela o fantasma ali e mostra Colocar/Cancelar
+  // (a colocação em si só acontece quando se confirma — ver confirmPlace)
+  _selectSpot(e){
+    if(e.target && e.target.closest && e.target.closest('#placeConfirmBar')) return;
+    const type = State.placingChar;
+    const ch = Characters[type];
+    if(!ch) return;
+    const r = game.getBoundingClientRect();
+    const xPct = (e.clientX - r.left)/r.width*100;
+    const yPct = (e.clientY - r.top)/r.height*100;
+    if(HeroSystem.isOnPath(xPct, yPct)) return;     // não pode no caminho
+    if(xPct < 2 || xPct > 98 || yPct < 2 || yPct > 98) return;  // dentro do mapa
+    const tooClose = State.heroes.some(h =>
+      Math.abs(h.xPct - xPct) < 3 && Math.abs(h.yPct - yPct) < 5);
+    if(tooClose) return;
+    if(!HeroSystem.canPlaceMore(type)) return;      // limite atingido
+    e.stopPropagation();
+    e.preventDefault();
+
+    // Garante que existe um fantasma (ex.: toque direto, sem passar por _move antes)
+    if(!HeroSystem.ghost){
+      if(ch.arena){
+        HeroSystem.ghost = ArenaArt.makeSprite(ch);
+        HeroSystem.ghost.classList.add('hero','arenaHero','ghost');
+        HeroSystem.ghost.style.opacity = '0.5';
+      }else{
+        HeroSystem.ghost = buildStick('hero ghost');
+        HeroSystem.ghost.style.color = ch.color;
+      }
+      game.appendChild(HeroSystem.ghost);
+    }
+    HeroSystem.ghost.style.display = '';
+    HeroSystem.ghost.style.left = xPct + '%';
+    HeroSystem.ghost.style.top  = yPct + '%';
+    MurasakiRange.showGhostRing(xPct, yPct);
+
+    // Congela o local escolhido e mostra os botões de confirmação
+    HeroSystem.pendingSpot = { xPct, yPct };
+    HeroSystem.confirming = true;
+    placeConfirmBar.classList.remove('hidden');
+    prepHint.classList.add('hidden');
+  },
+
+  // Confirma a colocação no local escolhido (botão "Colocar")
+  confirmPlace(){
+    if(!this.pendingSpot || !State.placingChar){ this.cancelPlacing(); return; }
+    const { xPct, yPct } = this.pendingSpot;
+    const r = game.getBoundingClientRect();
+    // Reaproveita toda a lógica original de criação do herói (_place),
+    // simulando um clique exatamente no local já escolhido e congelado.
+    const fakeEvent = {
+      clientX: r.left + (xPct/100) * r.width,
+      clientY: r.top  + (yPct/100) * r.height,
+      stopPropagation(){}, preventDefault(){},
+    };
+    this.confirming = false;
+    this.pendingSpot = null;
+    placeConfirmBar.classList.add('hidden');
+    this._place(fakeEvent);
+    State.placingChar = null;   // desseleciona o tipo de personagem na barra
+    CharBar.render();
   },
 
   // Coloca um herói (se posição válida e dinheiro suficiente)
@@ -9525,8 +9663,8 @@ const CharBar = {
     });
   },
 
-  show(){ charBar.classList.remove('hidden'); invBtn.classList.remove('hidden'); },
-  hide(){ charBar.classList.add('hidden'); invBtn.classList.add('hidden'); },
+  show(){ charBar.classList.remove('hidden'); invBtn.classList.remove('hidden'); speedBtn.classList.add('hidden'); },
+  hide(){ charBar.classList.add('hidden'); invBtn.classList.add('hidden'); speedBtn.classList.add('hidden'); },
 };
 
 /* ============================================================
@@ -11257,6 +11395,7 @@ const Boss60System = {
       YutaSystem.cancelChoosing();
       startBtn.classList.add('hidden');
       invBtn.classList.add('hidden');
+      speedBtn.classList.remove('hidden'); speedBtn.classList.remove('active');
       prepHint.classList.add('hidden');
       State.running = true;
       // Inimigos no mapa teste não dão dinheiro — override temporário
@@ -11636,6 +11775,7 @@ const Boss60System = {
       YutaSystem.cancelChoosing();
       startBtn.classList.add('hidden');
       invBtn.classList.add('hidden');
+      speedBtn.classList.remove('hidden'); speedBtn.classList.remove('active');
       prepHint.classList.add('hidden');
       State.running = true;
       // Configura o RoundSystem para começar no round 61
@@ -11801,6 +11941,7 @@ const GameSystem = {
       MP.send('requestStart', {});
       startBtn.classList.add('hidden');
       invBtn.classList.add('hidden');
+      speedBtn.classList.remove('hidden'); speedBtn.classList.remove('active');
       prepHint.classList.add('hidden');
       return;
     }
@@ -11808,6 +11949,7 @@ const GameSystem = {
     HeroSystem.cancelPlacing();              // termina qualquer colocação pendente
     startBtn.classList.add('hidden');
     invBtn.classList.add('hidden');          // inventário só na preparação
+    speedBtn.classList.remove('hidden'); speedBtn.classList.remove('active');
     prepHint.classList.add('hidden');
     State.running = true;
     RoundSystem.begin();
@@ -11846,6 +11988,7 @@ const GameSystem = {
     if(!State.running) return;
     State.speedMult = State.speedMult === 1 ? Config.fastForwardMult : 1;
     game.style.setProperty('--anim-scale', State.speedMult);
+    speedBtn.classList.toggle('active', State.speedMult !== 1);
   },
 
   // Fim de partida (win = true vitória)
@@ -11854,6 +11997,8 @@ const GameSystem = {
     State.running = false;
     gearBtn.classList.add('hidden');
     fusionBtn.classList.add('hidden');   // esconde oferta de fusão ao terminar
+    speedBtn.classList.add('hidden');
+    speedBtn.classList.remove('active');
 
     // Multijogador: avisa o jogador que entrou na sala de que a partida acabou
     if(typeof MP !== 'undefined' && MP.role === 'host'){
@@ -12349,6 +12494,8 @@ const MP = {
 
   _showClientEnd(win){
     State.running = false;
+    speedBtn.classList.add('hidden');
+    speedBtn.classList.remove('active');
     endTitle.textContent = win ? 'VITÓRIA!' : 'DERROTA';
     endTitle.className = win ? 'win' : 'lose';
     endText.textContent = win
@@ -12448,6 +12595,9 @@ playBtn.addEventListener('click', () => GameSystem.showMapSelect());
 startBtn.addEventListener('click', () => GameSystem.start());
 restartBtn.addEventListener('click', () => GameSystem.showMapSelect());  // volta à seleção de mapa
 invBtn.addEventListener('click', () => Inventory.open());
+speedBtn.addEventListener('click', () => GameSystem.toggleSpeed());
+placeConfirmBtn.addEventListener('click', (ev) => { ev.stopPropagation(); HeroSystem.confirmPlace(); });
+placeCancelBtn.addEventListener('click', (ev) => { ev.stopPropagation(); HeroSystem.cancelPlacing(); });
 invCloseBtn.addEventListener('click', () => Inventory.close());
 invClearBtn.addEventListener('click', () => Inventory.clearAll());
 // Engrenagem
@@ -12486,6 +12636,7 @@ $('#cacaModeBackBtn').addEventListener('click', () => {
 /* ---------- Clicar no mapa fora de um herói desfaz a seleção ---------- */
 game.addEventListener('click', (ev) => {
   if(State.placingChar) return;   // em modo de colocação, não deseleciona
+  if(ev.target && ev.target.closest && ev.target.closest('#placeConfirmBar')) return; // botões Colocar/Cancelar
   // Cliques dentro do painel de upgrade não deselecionam
   if(upgradePanel.contains(ev.target)) return;
   if(State.selectedHero){
