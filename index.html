@@ -98,6 +98,7 @@ body{
   width:100%;
   height:100%;
   display:block;
+  cursor:pointer;   /* garante que o toque em área vazia gera sempre "click" (compatibilidade móvel) */
 }
 
 /* ---------- BASE / TORRE (posicionada no fim do caminho via JS) ---------- */
@@ -4607,9 +4608,6 @@ const Panel = {
       let badge5 = h.el.querySelector('.upgradeBadge');
       if(badge5){ badge5.textContent = '★★★★★'; badge5.title = 'Bola de Ki'; }
       if(State.selectedHero === h) MurasakiRange.showRing(h);
-      MurasakiRange.hideRing(h);
-      State.selectedHero = null;
-      State.heroes.forEach(hh => hh.el.classList.remove('selected'));
       this.render();
       return;
     }
@@ -4658,9 +4656,6 @@ const Panel = {
       }
       h.dmgMult = 1;
       if(State.selectedHero === h) MurasakiRange.showRing(h);
-      MurasakiRange.hideRing(h);
-      State.selectedHero = null;
-      State.heroes.forEach(hh => hh.el.classList.remove('selected'));
       this.render();
       return;
     }
@@ -4694,9 +4689,6 @@ const Panel = {
         FusionSystem.cancel();
       }
       if(State.selectedHero === h) MurasakiRange.showRing(h);
-      MurasakiRange.hideRing(h);
-      State.selectedHero = null;
-      State.heroes.forEach(hh => hh.el.classList.remove('selected'));
       this.render();
       return;
     }
@@ -4841,9 +4833,6 @@ const Panel = {
       }
 
       if(State.selectedHero === h) MurasakiRange.showRing(h);
-      MurasakiRange.hideRing(h);
-      State.selectedHero = null;
-      State.heroes.forEach(hh => hh.el.classList.remove('selected'));
       FusionSystem.check();      // pode habilitar a fusão Goku+Vegeta
       this.render();
       return;
@@ -4908,10 +4897,8 @@ const Panel = {
     h.baseCooldown = h.cooldown;
     // Actualiza o anel de alcance (raio aumenta com o upgrade)
     if(State.selectedHero === h) MurasakiRange.showRing(h);
-    // Após upgrade, desseleciona o herói (excepção pedida)
-    MurasakiRange.hideRing(h);
-    State.selectedHero = null;
-    State.heroes.forEach(hh => hh.el.classList.remove('selected'));
+    // O herói continua selecionado após o upgrade (fecha só ao trocar,
+    // tocar nele de novo, ou tocar num espaço vazio do mapa)
     this.render();
   },
 
@@ -5129,9 +5116,6 @@ const KailanySystem = {
     if(h.kailanyLevel === 0){
       // Vai para o tijolo imediatamente
       this.applyLevel(h, 1);
-      MurasakiRange.hideRing(h);
-      State.selectedHero = null;
-      State.heroes.forEach(hh => hh.el.classList.remove('selected'));
       Panel.render();
       return;
     }
@@ -5140,9 +5124,6 @@ const KailanySystem = {
       // Mostra a mensagem; ao fim de 5s a Kailany transforma-se (no mesmo personagem).
       h.pendingAmor = this.MSG_MS;
       kailanyMsg.classList.remove('hidden');
-      MurasakiRange.hideRing(h);
-      State.selectedHero = null;
-      State.heroes.forEach(hh => hh.el.classList.remove('selected'));
       Panel.render();
       return;
     }
@@ -5254,9 +5235,6 @@ const ZoroSystem = {
     if(!Money.spend(cost)) return;
     h.invested += cost;
     this.applyLevel(h, h.zoroLevel + 1);
-    MurasakiRange.hideRing(h);
-    State.selectedHero = null;
-    State.heroes.forEach(hh => hh.el.classList.remove('selected'));
     Panel.render();
   },
 };
@@ -5324,9 +5302,6 @@ const GutsSystem = {
     if(!Money.spend(cost)) return;
     h.invested += cost;
     this.applyLevel(h, h.gutsLevel + 1);
-    MurasakiRange.hideRing(h);
-    State.selectedHero = null;
-    State.heroes.forEach(hh => hh.el.classList.remove('selected'));
     Panel.render();
   },
 };
@@ -5631,9 +5606,6 @@ const ArthurSystem = {
     if(!Money.spend(cost)) return;
     h.invested += cost;
     this.applyLevel(h, h.arthurLevel + 1);
-    MurasakiRange.hideRing(h);
-    State.selectedHero = null;
-    State.heroes.forEach(hh => hh.el.classList.remove('selected'));
     Panel.render();
   },
 };
@@ -5711,9 +5683,6 @@ const SukunaSystem = {
     if(!Money.spend(cost)) return;
     h.invested += cost;
     this.applyLevel(h, h.sukunaLevel + 1);
-    MurasakiRange.hideRing(h);
-    State.selectedHero = null;
-    State.heroes.forEach(hh => hh.el.classList.remove('selected'));
     Panel.render();
   },
 };
@@ -5877,9 +5846,6 @@ const GojoSystem = {
     if(!Money.spend(cost)) return;
     h.invested += cost;
     this.applyLevel(h, h.gojoLevel + 1);
-    MurasakiRange.hideRing(h);
-    State.selectedHero = null;
-    State.heroes.forEach(hh => hh.el.classList.remove('selected'));
     Panel.render();
   },
 
@@ -5976,9 +5942,6 @@ const KaidoSystem = {
     if(!Money.spend(cost)) return;
     h.invested += cost;
     this.applyLevel(h, h.kaidoLevel + 1);
-    MurasakiRange.hideRing(h);
-    State.selectedHero = null;
-    State.heroes.forEach(hh => hh.el.classList.remove('selected'));
     Panel.render();
   },
 };
@@ -6074,9 +6037,6 @@ const FrezzaSystem = {
     if(!Money.spend(cost)) return;
     h.invested += cost;
     this.applyLevel(h, h.frezzaLevel + 1);
-    MurasakiRange.hideRing(h);
-    State.selectedHero = null;
-    State.heroes.forEach(hh => hh.el.classList.remove('selected'));
     Panel.render();
   },
 };
@@ -6177,9 +6137,6 @@ const GohanSystem = {
     if(!Money.spend(cost)) return;
     h.invested += cost;
     this.applyLevel(h, h.gohanLevel + 1);
-    MurasakiRange.hideRing(h);
-    State.selectedHero = null;
-    State.heroes.forEach(hh => hh.el.classList.remove('selected'));
     Panel.render();
   },
 };
@@ -6256,9 +6213,6 @@ const ShidouSystem = {
     if(!Money.spend(cost)) return;
     h.invested += cost;
     this.applyLevel(h, h.shidouLevel + 1);
-    MurasakiRange.hideRing(h);
-    State.selectedHero = null;
-    State.heroes.forEach(hh => hh.el.classList.remove('selected'));
     Panel.render();
   },
 };
@@ -6333,9 +6287,6 @@ const BarouSystem = {
     if(!Money.spend(cost)) return;
     h.invested += cost;
     this.applyLevel(h, h.barouLevel + 1);
-    MurasakiRange.hideRing(h);
-    State.selectedHero = null;
-    State.heroes.forEach(hh => hh.el.classList.remove('selected'));
     Panel.render();
   },
 };
@@ -6419,9 +6370,6 @@ const JuliosSystem = {
     if(!Money.spend(cost)) return;
     h.invested += cost;
     this.applyLevel(h, h.juliosLevel + 1);
-    MurasakiRange.hideRing(h);
-    State.selectedHero = null;
-    State.heroes.forEach(hh => hh.el.classList.remove('selected'));
     Panel.render();
   },
 };
@@ -6498,9 +6446,6 @@ const MuzanSystem = {
     if(!Money.spend(cost)) return;
     h.invested += cost;
     this.applyLevel(h, h.muzanLevel + 1);
-    MurasakiRange.hideRing(h);
-    State.selectedHero = null;
-    State.heroes.forEach(hh => hh.el.classList.remove('selected'));
     Panel.render();
   },
 };
@@ -6569,9 +6514,6 @@ const KokushiboSystem = {
     if(!Money.spend(cost)) return;
     h.invested += cost;
     this.applyLevel(h, h.kokushiboLevel + 1);
-    MurasakiRange.hideRing(h);
-    State.selectedHero = null;
-    State.heroes.forEach(hh => hh.el.classList.remove('selected'));
     Panel.render();
   },
 };
@@ -6646,9 +6588,6 @@ const ZenitsuSystem = {
     if(!Money.spend(cost)) return;
     h.invested += cost;
     this.applyLevel(h, h.zenitsuLevel + 1);
-    MurasakiRange.hideRing(h);
-    State.selectedHero = null;
-    State.heroes.forEach(hh => hh.el.classList.remove('selected'));
     Panel.render();
   },
 };
@@ -6718,9 +6657,6 @@ const ZarakiSystem = {
     if(!Money.spend(cost)) return;
     h.invested += cost;
     this.applyLevel(h, h.zarakiLevel + 1);
-    MurasakiRange.hideRing(h);
-    State.selectedHero = null;
-    State.heroes.forEach(hh => hh.el.classList.remove('selected'));
     Panel.render();
   },
 };
@@ -6797,9 +6733,6 @@ const AizenSystem = {
     if(!Money.spend(cost)) return;
     h.invested += cost;
     this.applyLevel(h, h.aizenLevel + 1);
-    MurasakiRange.hideRing(h);
-    State.selectedHero = null;
-    State.heroes.forEach(hh => hh.el.classList.remove('selected'));
     Panel.render();
   },
 
@@ -6899,9 +6832,6 @@ const IchigoSystem = {
     if(!Money.spend(cost)) return;
     h.invested += cost;
     this.applyLevel(h, h.ichigoLevel + 1);
-    MurasakiRange.hideRing(h);
-    State.selectedHero = null;
-    State.heroes.forEach(hh => hh.el.classList.remove('selected'));
     Panel.render();
   },
 };
@@ -6976,9 +6906,6 @@ const UraharaSystem = {
     if(!Money.spend(cost)) return;
     h.invested += cost;
     this.applyLevel(h, h.uraharaLevel + 1);
-    MurasakiRange.hideRing(h);
-    State.selectedHero = null;
-    State.heroes.forEach(hh => hh.el.classList.remove('selected'));
     Panel.render();
   },
 
@@ -7164,9 +7091,6 @@ const MadaraSystem = {
     if(!Money.spend(cost)) return;
     h.invested += cost;
     this.applyLevel(h, h.madaraLevel + 1);
-    MurasakiRange.hideRing(h);
-    State.selectedHero = null;
-    State.heroes.forEach(hh => hh.el.classList.remove('selected'));
     Panel.render();
   },
 };
@@ -7241,9 +7165,6 @@ const ObitoSystem = {
     if(!Money.spend(cost)) return;
     h.invested += cost;
     this.applyLevel(h, h.obitoLevel + 1);
-    MurasakiRange.hideRing(h);
-    State.selectedHero = null;
-    State.heroes.forEach(hh => hh.el.classList.remove('selected'));
     Panel.render();
   },
 };
@@ -7316,9 +7237,6 @@ const AstaSystem = {
     if(!Money.spend(cost)) return;
     h.invested += cost;
     this.applyLevel(h, h.astaLevel + 1);
-    MurasakiRange.hideRing(h);
-    State.selectedHero = null;
-    State.heroes.forEach(hh => hh.el.classList.remove('selected'));
     Panel.render();
   },
 };
@@ -7388,9 +7306,6 @@ const YunoSystem = {
     if(!Money.spend(cost)) return;
     h.invested += cost;
     this.applyLevel(h, h.yunoLevel + 1);
-    MurasakiRange.hideRing(h);
-    State.selectedHero = null;
-    State.heroes.forEach(hh => hh.el.classList.remove('selected'));
     Panel.render();
   },
 
