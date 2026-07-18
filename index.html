@@ -2,7 +2,7 @@
 <html lang="pt-PT">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Stickman Tower Defense</title>
 <style>
 /* ============================================================
@@ -31,6 +31,11 @@
 *{box-sizing:border-box;margin:0;padding:0;}
 
 html,body{height:100%;}
+html{
+  touch-action:manipulation;      /* remove o atraso/duplo-toque de zoom */
+  -webkit-text-size-adjust:100%;
+  overscroll-behavior:none;       /* evita o "puxar para atualizar" no telemóvel */
+}
 body{
   font-family:var(--font);
   background:#1c1d20;
@@ -39,10 +44,18 @@ body{
   align-items:center;
   justify-content:center;
   min-height:100vh;
+  min-height:100dvh;              /* altura correta em Safari/Chrome móvel (barra de endereço) */
   padding:16px;
+  padding:max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  overflow:hidden;                /* impede o scroll da página enquanto se joga */
   -webkit-user-select:none;
   user-select:none;
+  -webkit-touch-callout:none;     /* impede o menu de "guardar imagem" ao toque longo */
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
 }
+/* Grelhas com scroll vertical (loja, inventário) mantêm o gesto de deslizar */
+#shopGrid, #invGrid{ -webkit-overflow-scrolling:touch; }
 
 /* ---------- ESTRUTURA GERAL ---------- */
 #game{
@@ -1162,6 +1175,71 @@ body{
   font-size:10px;color:var(--accent-2);font-weight:bold;
   min-height:12px;
 }
+
+/* ============================================================
+   MODO TELEMÓVEL
+   ------------------------------------------------------------
+   O tabuleiro (#game) já encolhe sozinho (width:100%/aspect-ratio),
+   mas os elementos de HUD tinham tamanhos fixos pensados para
+   ecrã de computador. Nestas larguras, tudo fica mais compacto,
+   a barra de personagens ganha scroll horizontal por toque e os
+   alvos de toque ficam maiores.
+   ============================================================ */
+@media (max-width: 720px), (pointer:coarse) and (max-width: 900px){
+  body{ padding:8px; padding:max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
+
+  /* HUD (dinheiro / round / vidas) mais compacto */
+  #hud{ top:6px; left:6px; gap:6px; }
+  .chip{ padding:4px 8px; font-size:11px; gap:4px; }
+  .chip .val{ font-size:13px; }
+
+  /* Botões de fusão menores e sem sair do tabuleiro */
+  #fusionBtn{ top:6px; font-size:11px; padding:6px 12px; border-width:1px; }
+  #gogetaBtn{ top:6px; left:calc(50% + 92px); font-size:11px; padding:6px 12px; border-width:1px; }
+
+  /* Painel de upgrade: mais estreito e compacto para caber ao lado do tabuleiro pequeno */
+  #upgradePanel{ top:6px; right:6px; width:132px; padding:7px; }
+  #upgradePanel h3{ font-size:10px; margin-bottom:5px; }
+  #upgradeInfo{ font-size:10px; margin-bottom:5px; }
+  #upgradeBtn, #specialBtn{ font-size:9px; padding:8px 4px; }
+  #priorityBtn, #sellBtn{ font-size:9px; padding:9px 3px; }
+  .upgradeBadge{ font-size:8px; }
+
+  /* Barra de personagens: em vez de espremer tudo, desliza-se para os lados */
+  #charBar{
+    max-width:calc(100% - 16px);
+    overflow-x:auto;
+    overflow-y:hidden;
+    -webkit-overflow-scrolling:touch;
+    touch-action:pan-x;
+    scrollbar-width:none;
+    justify-content:flex-start;
+    gap:6px;
+    padding:6px 8px;
+    bottom:6px;
+  }
+  #charBar::-webkit-scrollbar{ display:none; }
+  .charSlot{ width:56px; height:66px; flex:0 0 auto; }
+  .charSlot .cost{ font-size:10px; }
+  .charSlot .count{ font-size:9px; }
+
+  /* Botões genéricos dos ecrãs de menu: alvo de toque maior */
+  .btn{ padding:13px 24px; font-size:15px; }
+  .btn.ghost.small{ padding:9px 14px; font-size:12px; }
+  .nameInput{ width:min(280px, 78vw); }
+  #roomCodeDisplay{ font-size:28px; letter-spacing:6px; padding:10px 16px; }
+  .screen h1{ font-size:22px; }
+  .screen p{ font-size:13px; max-width:88vw; }
+
+  #roomCornerBtn{ top:10px; right:10px; padding:9px 16px; font-size:12px; }
+}
+
+/* Telemóveis muito estreitos (≤ 380px): mais um nível de aperto */
+@media (max-width: 380px){
+  #upgradePanel{ width:112px; }
+  .charSlot{ width:50px; height:60px; }
+  #gogetaBtn{ left:calc(50% + 78px); font-size:10px; padding:5px 9px; }
+}
 </style>
 </head>
 <body>
@@ -1486,7 +1564,7 @@ const Config = {
   roundBonusBig: 200,     // bónus a partir do round 10 em mapas de 15 rounds
 
   // Velocidade do jogo (alternada com a tecla ESPAÇO)
-  fastForwardMult: 10,     // multiplicador no modo rápido
+  fastForwardMult: 25,     // multiplicador no modo rápido
 };
 
 /* ============================================================
@@ -2037,7 +2115,7 @@ const ShopPrices = {
   meliodas:20, kira:50, murasakibara:15, saitama:150, sungjinwoo:50,
   luffy:100, zoro:75, itadori:50, yuta:75, guts:200, rimuru:100,
   subaru:20, arthur:100, aang:20, estudante:10, sukuna:120, gojo:150, barbabranca:200, kaido:150, madara:100, obito:100, asta:75, yuno:75, yami:150, frezza:150, gohan:100, shidou:10, barou:10, julios:120, muzan:175, kokushibo:25, zenitsu:10, zaraki:250, aizen:100, ichigo:100, urahara:120,
-  verdade:100000,
+  verdade:10000,
 };
 // Personagens sempre gratuitos/desbloqueados desde o início
 const FREE_CHARACTERS = ['killua', 'peppa'];
