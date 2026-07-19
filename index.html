@@ -10850,9 +10850,24 @@ const RoundSystem = {
         else if(r > 100) Save.addCoins(20);   // moedas por round a partir do round 101
       }else{
         const isRepresa = State.map.bg === 'represa';
-        if(r === 50) Save.addCoins(isRepresa ? 100 : 50);
-        else if(r === 100) Save.addCoins(isRepresa ? 200 : 100);
-        else if(r > 100) Save.addCoins(isRepresa ? 10 : 5);   // moedas por round a partir do round 101
+        const isOnline = isRepresa && typeof MP !== 'undefined' && !!MP.role;
+        if(isOnline){
+          // Modo Online (mapa Represa): mesma recompensa de moedas para
+          // os DOIS jogadores (anfitrião e quem entrou na sala) —
+          // 100 no round 50, 250 no round 100, 50 por round a partir do 101.
+          let mpCoins = 0;
+          if(r === 50) mpCoins = 100;
+          else if(r === 100) mpCoins = 250;
+          else if(r > 100) mpCoins = 50;
+          if(mpCoins > 0){
+            Save.addCoins(mpCoins);              // moedas do anfitrião (neste dispositivo)
+            if(MP.role === 'host') MP.send('awardCoins', { amount: mpCoins }); // avisa quem entrou na sala para creditar as moedas dele
+          }
+        }else{
+          if(r === 50) Save.addCoins(isRepresa ? 100 : 50);
+          else if(r === 100) Save.addCoins(isRepresa ? 200 : 100);
+          else if(r > 100) Save.addCoins(isRepresa ? 10 : 5);   // moedas por round a partir do round 101
+        }
       }
     }
   },
@@ -12210,6 +12225,8 @@ const MP = {
         this.applySnapshot(msg.payload);
       } else if(msg.type === 'matchEnd'){
         this._showClientEnd(msg.payload.win);
+      } else if(msg.type === 'awardCoins'){
+        Save.addCoins(msg.payload.amount);   // moedas da loja, creditadas neste dispositivo (p2)
       }
     }
   },
