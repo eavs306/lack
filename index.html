@@ -1629,7 +1629,12 @@ const Config = {
   roundBonusBig: 200,     // bónus a partir do round 10 em mapas de 15 rounds
 
   // Velocidade do jogo (alternada com a tecla ESPAÇO)
-  fastForwardMult: 25,     // multiplicador no modo rápido
+  fastForwardMult: 25,     // multiplicador no modo rápido (aplicado à lógica: movimento, dano, timers)
+  maxAnimScale: 6,         // limite da escala visual das animações CSS (passo dos inimigos).
+                           // Acima disto o ciclo da animação (0.45s / escala) fica mais curto
+                           // que um frame de ecrã e o browser deixa de conseguir desenhá-la
+                           // sem saltos — os inimigos parecem "travar"/piscar em vez de andar.
+                           // A velocidade REAL do jogo não é afetada por este limite.
 };
 
 /* ============================================================
@@ -2241,7 +2246,18 @@ const Save = {
 
   coins(){ return this.data ? this.data.coins : 0; },
 
+  // Rede de segurança: se por algum motivo o perfil ainda não tiver sido
+  // carregado (this.data nulo) quando se tenta creditar/gastar moedas,
+  // carrega (ou cria) um perfil em vez de simplesmente ignorar a operação
+  // — assim nunca se perdem moedas ganhas em jogo por falta de perfil ativo.
+  _ensureLoaded(){
+    if(!this.data){
+      this.load(this.name || (localStorage.getItem('td_last_name') || 'guest'));
+    }
+  },
+
   addCoins(n){
+    this._ensureLoaded();
     if(!this.data || n <= 0) return;
     this.data.coins += n;
     this._persist();
@@ -2249,6 +2265,7 @@ const Save = {
 
   // Tenta comprar/desbloquear um personagem; devolve true se conseguiu
   buy(id){
+    this._ensureLoaded();
     if(this.isUnlocked(id)) return false;
     const price = ShopPrices[id];
     if(price === undefined) return false;
@@ -2282,11 +2299,36 @@ const Save = {
   },
 };
 
-// Ajusta o nº de slots de personagens (usado para mapas especiais como a
-// Represa, que permite 6 em vez dos 4 habituais). Preserva os personagens
-// já escolhidos nos slots que continuam a existir; se encolher, os
-// personagens que ficavam nos slots removidos são simplesmente descartados
-// da barra (voltam a ficar disponíveis no inventário).
+// ============================================================
+// PERSISTÊNCIA DO LOADOUT (barra de personagens + ataque escolhido)
+// ------------------------------------------------------------
+// Antes, CharSlots/ChosenAttack viviam só em memória: ao recarregar a
+// página (ex.: reabrir pelo link), voltavam sempre ao valor inicial
+// fixo no código e qualquer personagem comprado que não estivesse nesse
+// valor inicial "desaparecia" da barra. Agora guardamos e restauramos
+// isto por perfil (mesmo nome usado no Save), tal como as moedas.
+// ============================================================
+function _loadoutKey(name){ return 'td_loadout_' + name.trim().toLowerCase(); }
+
+function saveLoadout(){
+  if(!Save.name || Save._isEavs()) return;   // conta eavs não persiste nada
+  try{
+    localStorage.setItem(_loadoutKey(Save.name), JSON.stringify({ slots: CharSlots, attacks: ChosenAttack }));
+  }catch(e){ /* localStorage indisponível — ignora silenciosamente */ }
+}
+
+function loadLoadout(name){
+  if(!name || name.trim().toLowerCase() === 'eavs') return null;
+  try{
+    const raw = localStorage.getItem(_loadoutKey(name));
+    if(!raw) return null;
+    const parsed = JSON.parse(raw);
+    if(!parsed || !Array.isArray(parsed.slots)) return null;
+    return parsed;
+  }catch(e){ return null; }
+}
+
+
 function resizeCharSlots(size){
   if(CharSlots.length === size) return;
   if(CharSlots.length < size){
@@ -2296,6 +2338,7 @@ function resizeCharSlots(size){
     // encolhe: corta a partir do fim (mantém os primeiros 'size' escolhidos)
     CharSlots = CharSlots.slice(0, size);
   }
+  saveLoadout();
 }
 
 // Remove dos slots qualquer personagem que não esteja desbloqueado no
@@ -2993,6 +3036,18 @@ const Money = {
   },
   add(v){ this.set(State.money + v); },
   spend(v){ if(State.money >= v){ this.set(State.money - v); return true; } return false; },
+  // Recompensa PARTILHADA (morte de inimigo, bónus de fim de round): ambos os
+  // jogadores defendem a mesma base, por isso o ganho deve ir para os dois
+  // saldos — o do anfitrião (State.money) E o do jogador que entrou na sala
+  // (State.clientMoney) — e não só para quem está a "ver" o ecrã do anfitrião.
+  // Antes desta correção, estas recompensas só entravam em State.money, pelo
+  // que o jogador 2 nunca via o seu dinheiro aumentar (só diminuía ao comprar).
+  addShared(v){
+    this.add(v);
+    if(typeof MP !== 'undefined' && MP.role === 'host'){
+      State.clientMoney = Math.max(0, State.clientMoney + v);
+    }
+  },
 };
 
 /* ============================================================
@@ -8537,6 +8592,10 @@ const HeroSystem = {
     game.style.cursor = 'crosshair';
     game.addEventListener('mousemove', this._move);
     game.addEventListener('click', this._selectSpot, true); // captura antes do clique de seleção
+    // Atalho para PC/rato: dois cliques rápidos no mesmo local colocam de
+    // imediato, sem precisar de carregar no botão "Colocar" (o fluxo normal
+    // de clique único + barra Colocar/Cancelar continua a funcionar igual).
+    game.addEventListener('dblclick', this._confirmByDblClick, true);
   },
   disablePlacement(){
     this.placing = false;
@@ -8545,9 +8604,24 @@ const HeroSystem = {
     game.style.cursor = 'default';
     game.removeEventListener('mousemove', this._move);
     game.removeEventListener('click', this._selectSpot, true);
+    game.removeEventListener('dblclick', this._confirmByDblClick, true);
     if(this.ghost){ this.ghost.remove(); this.ghost = null; }
     MurasakiRange.removeGhostRing();
     placeConfirmBar.classList.add('hidden');
+  },
+
+  // Duplo clique no mesmo local: coloca imediatamente (atalho de PC),
+  // reaproveitando a mesma lógica de validação/custo do clique único.
+  _confirmByDblClick(e){
+    if(!State.placingChar) return;
+    e.stopPropagation();
+    e.preventDefault();
+    HeroSystem.confirming = false;
+    HeroSystem.pendingSpot = null;
+    placeConfirmBar.classList.add('hidden');
+    HeroSystem._place(e);
+    State.placingChar = null;   // desseleciona o tipo de personagem na barra
+    CharBar.render();
   },
 
   // Mostra o "fantasma" a seguir o rato (apenas em posições válidas)
@@ -9612,18 +9686,21 @@ const Inventory = {
       if(free >= 0) CharSlots[free] = id;   // ocupa 1º slot livre
       // se não há slot livre, ignora (já tem 4)
     }
+    saveLoadout();
     this.build();
   },
 
   // Remove todos os personagens dos slots (mantém o nº de slots atual)
   clearAll(){
     CharSlots = CharSlots.map(() => null);
+    saveLoadout();
     this.build();
   },
 
   // Define o ataque escolhido de um personagem
   setAttack(id, atk){
     ChosenAttack[id] = atk;
+    saveLoadout();
     this.build();
   },
 
@@ -10401,7 +10478,7 @@ const EnemySystem = {
     // e ele volta com metade da vida e o dobro da velocidade.
     if(e.whiteBoss100 && !e.whiteBoss100Phase2){
       e.alive = false;
-      Money.add(e.reward);
+      Money.addShared(e.reward);
       Upgrades.render();
       e.el.classList.add('dying');
       setTimeout(() => e.el.remove(), 250);
@@ -10411,7 +10488,7 @@ const EnemySystem = {
     }
     if(!e.alive) return;
     e.alive = false;
-    Money.add(e.reward);
+    Money.addShared(e.reward);
     Upgrades.render();
     e.el.classList.add('dying');
     setTimeout(() => e.el.remove(), 250);
@@ -10823,7 +10900,7 @@ const RoundSystem = {
   _awardRoundBonus(r){
     if(State._testMapNoReward) return;  // no mapa teste especial não há bónus
     if(State.map && State.map.bg === 'caca'){
-      Money.add(100);   // "Dia da Caça": sempre 100 de dinheiro por round concluído
+      Money.addShared(100);   // "Dia da Caça": sempre 100 de dinheiro por round concluído
       // Recompensa extra de moedas da loja no modo Infinito (rounds 50/100 e além)
       if(r === 50) Save.addCoins(75);
       else if(r === 100) Save.addCoins(150);
@@ -10835,7 +10912,7 @@ const RoundSystem = {
                 ? Config.roundBonusBig    // 200 (a partir da virada p/ o round 11)
                 : Config.roundBonus;      // 100
     const isTrindade = State.map && State.map.bg === 'trindade';
-    Money.add(isTrindade ? bonus * 2 : bonus);   // Trindade: dinheiro por round em dobro
+    Money.addShared(isTrindade ? bonus * 2 : bonus);   // Trindade: dinheiro por round em dobro
 
     // Recompensa de moedas da loja por passar os rounds 50/100 nos mapas infinitos
     if(State.map && State.map.infinite){
@@ -11917,7 +11994,12 @@ const GameSystem = {
   toggleSpeed(){
     if(!State.running) return;
     State.speedMult = State.speedMult === 1 ? Config.fastForwardMult : 1;
-    game.style.setProperty('--anim-scale', State.speedMult);
+    // A velocidade do JOGO (movimento, dano, timers) usa sempre o
+    // multiplicador completo (State.speedMult); a escala VISUAL da animação
+    // CSS é limitada (ver Config.maxAnimScale) para não ficar mais rápida
+    // do que o ecrã consegue desenhar.
+    const visualScale = Math.min(State.speedMult, Config.maxAnimScale);
+    game.style.setProperty('--anim-scale', visualScale);
     speedBtn.classList.toggle('active', State.speedMult !== 1);
   },
 
@@ -12051,12 +12133,20 @@ function confirmName(){
   if(!name){ nameInput.focus(); return; }
   Save.load(name);
   try{ localStorage.setItem('td_last_name', name); }catch(e){}
+  // Restaura a barra de personagens e os ataques escolhidos deste perfil
+  // (persistidos localmente), em vez de voltar sempre ao valor padrão.
+  const savedLoadout = loadLoadout(name);
+  if(savedLoadout){
+    CharSlots = savedLoadout.slots.slice();
+    if(savedLoadout.attacks) Object.assign(ChosenAttack, savedLoadout.attacks);
+  }
   syncCharSlotsWithUnlocks();
   // Perfil novo (sem nenhum personagem escolhido ainda): começa com os 2 gratuitos
   if(CharSlots.every(id => !id)){
     CharSlots[0] = 'killua';
     if(CharSlots.length > 1) CharSlots[1] = 'peppa';
   }
+  saveLoadout();
   nameScreen.classList.add('hidden');
   GameSystem.showStartScreen();
 }
