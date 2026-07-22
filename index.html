@@ -9969,9 +9969,15 @@ const HeroSystem = {
     }
 
     // SAITAMA "SÉRIO" (após o evento com o Garou no máximo): dano = vida
-    // ATUAL do alvo (inclui chefes) — sempre um golpe fatal.
+    // do inimigo com MAIS vida presente no mapa neste momento (inclui
+    // chefes) — como esse valor nunca é menor que a vida do alvo atual,
+    // o golpe continua sempre fatal para quem for atingido.
     if(h.saitamaSerio && h.type === 'saitama' && target){
-      dmg = target.hp;
+      let maxHp = target.hp;
+      for(const e of State.enemies){
+        if(e.alive !== false && e.hp > maxHp) maxHp = e.hp;
+      }
+      dmg = maxHp;
     }
 
     // GAROU (Galáxia, up2): dano dinâmico = vida que os inimigos tinham no
