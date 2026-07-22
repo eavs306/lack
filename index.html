@@ -368,6 +368,7 @@ body{
 .hasAura.aura-purple{ filter:drop-shadow(0 0 6px #e0a0ff) drop-shadow(0 0 12px #9030e0); }
 .hasAura.aura-graywhite{ filter:drop-shadow(0 0 6px #e8e8e8) drop-shadow(0 0 12px #ffffff); }
 .hasAura.aura-pink{ filter:drop-shadow(0 0 6px #ffb3d9) drop-shadow(0 0 12px #ff4fa8); }
+.hasAura.aura-darkgreen{ filter:drop-shadow(0 0 6px #4a9a5a) drop-shadow(0 0 12px #0f5a24); }
 .goku-aura{
   position:absolute;
   width:60px; height:60px;
@@ -386,6 +387,7 @@ body{
 .goku-aura.aura-purple{ background:radial-gradient(circle, rgba(224,160,255,.6) 0%, rgba(144,48,224,.28) 45%, rgba(144,48,224,0) 70%); }
 .goku-aura.aura-graywhite{ background:radial-gradient(circle, rgba(255,255,255,.7) 0%, rgba(220,220,220,.3) 45%, rgba(220,220,220,0) 70%); }
 .goku-aura.aura-pink{ background:radial-gradient(circle, rgba(255,179,217,.6) 0%, rgba(255,79,168,.28) 45%, rgba(255,79,168,0) 70%); }
+.goku-aura.aura-darkgreen{ background:radial-gradient(circle, rgba(74,154,90,.6) 0%, rgba(15,90,36,.3) 45%, rgba(15,90,36,0) 70%); }
 @keyframes auraPulse{ from{opacity:.55;transform:translate(-50%,-50%) scale(.9);} to{opacity:1;transform:translate(-50%,-50%) scale(1.15);} }
 /* Linha inferior com botões Prioridade + Vender */
 #bottomBtns{
@@ -514,6 +516,10 @@ body{
 .enemy.mega-boss .body,
 .enemy.mega-boss .arm,
 .enemy.mega-boss .leg{background:#f0f0f0;}
+/* EREN (Fundador) — chefe gigante invocado como ALIADO: mesmo visual do
+   chefe do round 50, mas com um matiz esverdeado para diferenciar de um
+   inimigo de verdade. */
+.enemy.mega-boss.eren-summon{filter:hue-rotate(100deg) saturate(1.3) brightness(1.05);}
 /* cachecol cinza enrolado ao pescoço, com uma ponta a pender */
 .enemy.mega-boss .mega-scarf{
   position:absolute;
@@ -643,6 +649,29 @@ body{
 /* fase 2 (após a tela branca): mesma aparência, apenas mais rápido */
 .enemy.white-boss-100.phase2{filter:drop-shadow(0 0 6px #fff);}
 
+/* MENSAGEM "Agora me verão sério" — Garou (Galáxia) + Saitama (Adaptativo) no máximo */
+#saitamaSerioMsg{
+  position:absolute;
+  left:50%; top:16%;
+  transform:translate(-50%,-50%) scale(.85);
+  background:rgba(10,10,14,.9);
+  color:#fff;
+  font-weight:bold;
+  font-size:18px;
+  letter-spacing:.5px;
+  padding:14px 22px;
+  border-radius:10px;
+  border:2px solid #c0473b;
+  box-shadow:0 0 18px rgba(192,71,59,.7), 0 4px 14px rgba(0,0,0,.5);
+  z-index:90;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .3s, transform .3s;
+  text-align:center;
+  white-space:nowrap;
+}
+#saitamaSerioMsg.visible{opacity:1; transform:translate(-50%,-50%) scale(1);}
+
 /* TELA BRANCA: transição de fase do chefe do round 100 */
 #whiteFlash100{
   position:absolute; inset:0; background:#fff;
@@ -711,6 +740,16 @@ body{
   white-space:nowrap;
 }
 
+/* ---------- INTERPOLAÇÃO DE REDE (P2 online) ----------
+   O jogador que ENTRA na sala só recebe fotografias (snapshots) do
+   anfitrião ~8x por segundo; sem isto, cada herói/inimigo "salta"
+   de posição em posição. Com esta transição, o elemento desliza
+   suavemente até à posição nova em vez de saltar — e como a duração
+   é fixa em tempo real, o efeito continua fluido mesmo em modo
+   rápido (os saltos entre fotografias ficam maiores, mas o deslize
+   acontece à mesma velocidade real, só percorre mais distância). */
+.netInterp{ transition: left .16s linear, top .16s linear; }
+
 /* --- Herói: stickman castanho --- */
 .hero{color:var(--hero);z-index:15;cursor:pointer;}
 /* Herói selecionado para upgrade: brilho/realce */
@@ -765,6 +804,10 @@ body{
 }
 .arenaHero.small-hero{
   width:38px; height:58px;
+}
+/* EREN — Titã de Ataque/Fundador (up1/up2): fica maior */
+.arenaHero.big-hero{
+  width:78px; height:120px;
 }
 .arenaHero.selected{
   filter:drop-shadow(0 0 6px var(--accent)) drop-shadow(0 0 3px var(--accent));
@@ -1302,6 +1345,8 @@ body{
   <!-- Overlay para o flash preto (especial do Kira) -->
   <div id="blackFlash"></div>
   <div id="whiteFlash100"></div>
+  <!-- Mensagem "Agora me verão sério" (Garou Galáxia + Saitama Adaptativo no máximo) -->
+  <div id="saitamaSerioMsg">Agora me verão sério...</div>
   <!-- Torre / base no fim do caminho -->
   <div id="base">BASE</div>
   <!-- Vidas representadas como corações por cima da base -->
@@ -1552,6 +1597,7 @@ const placeCancelBtn  = $('#placeCancelBtn');
 const boss60Overlay = $('#boss60Overlay');
 const boss60Circle  = $('#boss60Circle');
 const boss60Text    = $('#boss60Text');
+const saitamaSerioMsg = $('#saitamaSerioMsg');
 const gearBtn     = $('#gearBtn');
 const gearScreen  = $('#gearScreen');
 const gearMapBtn     = $('#gearMapBtn');
@@ -1999,6 +2045,56 @@ const ROSTER = [
   //                10 dano · 1.5s · alcance do Murasakibara (189)
   { id:'yuno', name:'Yuno', color:'#1a4a1a', hair:'#1c1c1c', arena:true,
     cost:700, dmg:{punch:30,low:30,high:30,head:30}, spd:{punch:1,low:1,high:1,head:1}, special:'Magia Anjo', uses:1, limit:1, kind:'green', baseKind:'green' },
+  // KANEKI — progressão própria (gerida pelo KanekiSystem, à semelhança do
+  // Madara/Óbito). Limite 3 (não é único: preço NÃO é triplicado e é vendível).
+  //  · base/colocação: 25 dano  · 0.9s  · alcance do Goku SEM up (378)  · preço 600 ·
+  //                    ataca com kagunes vermelhas
+  //  · up1 (Cabelo Branco): 90 dano · 1.5s · alcance do Goku COM up (661.5) · preço 2500 ·
+  //                    cabelo fica branco; continua a atacar com kagunes vermelhas
+  { id:'kaneki', name:'Kaneki', color:'#1c1c1c', hair:'#1c1c1c', arena:true,
+    cost:600, dmg:{punch:25,low:25,high:25,head:25}, spd:{punch:0.9,low:0.9,high:0.9,head:0.9}, special:'Kagune', uses:Infinity, limit:3, kind:'redkagune', baseKind:'redkagune' },
+  // PICO — sem progressão, colocação simples. Limite 5.
+  // 7 dano · 1s · alcance do Murasakibara sem up (189) · preço 50 · ataque gelado
+  { id:'pico', name:'Pico', color:'#e85aa8', hair:'#f0d525', arena:true,
+    cost:50, dmg:{punch:7,low:7,high:7,head:7}, spd:{punch:1,low:1,high:1,head:1}, special:'Nenhum', uses:Infinity, limit:5, kind:'iceshard', baseKind:'iceshard' },
+  // GAROU — progressão própria (gerida pelo GarouSystem). Limite 1 (único em
+  // campo: preço NÃO é triplicado — ver override manual — e não é vendível).
+  // Ataque corpo-a-corpo (sem projétil próprio, kind:null).
+  //  · base/colocação: 50 dano  · 0.50s · alcance do Goku SEM up (378)              · preço 1000
+  //  · up1 (Monstro): 150 dano  · 1s    · alcance do Goku COM up (661.5)            · preço 3500
+  //  · up2 (Galáxia): dano dinâmico = vida que os inimigos tinham no ROUND
+  //                   ANTERIOR (round 1 = 0 dano, sem round anterior)
+  //                   (contra chefes/inimigos rápidos usa o dano fixo do Monstro, 150) ·
+  //                   2.20s · alcance do Goku COM up +0.25× (826.875) · preço 4500
+  { id:'garou', name:'Garou', color:'#2a2a2e', hair:'#f0f0ea', arena:true,
+    cost:1000, dmg:{punch:50,low:50,high:50,head:50}, spd:{punch:0.5,low:0.5,high:0.5,head:0.5}, special:'Monstro', uses:Infinity, limit:1, kind:null, baseKind:null },
+  // MERUEM — progressão própria (gerida pelo MeruemSystem). Limite 1 (único
+  // em campo: preço NÃO é triplicado — ver override manual — e não é vendível).
+  // Ataque corpo-a-corpo na base (sem projétil, kind:null); Alcance não foi
+  // especificado no enunciado; assumido como o alcance do Goku COM up (661.5)
+  // em ambos os níveis.
+  //  · base/colocação: 120 dano · 1s    · alcance do Goku COM up (661.5) · preço 2500
+  //  · up1 (Rosa): 900 dano     · 0.5s  · alcance do Goku COM up (661.5) · preço 9000 ·
+  //                o ataque vira uma bola de Nen rosa (kind:'pinkball') e o
+  //                Meruem ganha uma aura verde escuro (o corpo NÃO muda de cor)
+  { id:'meruem', name:'Meruem', color:'#16241e', hair:'#0a0a0a', arena:true,
+    cost:2500, dmg:{punch:120,low:120,high:120,head:120}, spd:{punch:1,low:1,high:1,head:1}, special:'Nen', uses:Infinity, limit:1, kind:null, baseKind:null },
+  // EREN — progressão própria (gerida pelo ErenSystem). Limite 1 (único em
+  // campo: preço NÃO é triplicado — ver override manual — e não é vendível).
+  // Ataque corpo-a-corpo (sem projétil próprio, kind:null). Alcance não foi
+  // especificado no enunciado; assumido como o alcance do Goku COM up (661.5)
+  // em todos os níveis.
+  //  · base/colocação: 30 dano    · 1s · alcance do Goku COM up (661.5) · preço 900
+  //  · up1 (Titã de Ataque): 250 dano · 1s · alcance igual · preço 4000 ·
+  //                fica maior e com os olhos verdes
+  //  · up2 (Fundador): 1800 dano · 2s · alcance igual · preço 12000 ·
+  //                ganha o Especial (3 usos): invoca 1 chefe do round 50 (aliado)
+  //                que sai da base e anda até o início do caminho, "passando por
+  //                cima" (matando) os inimigos que encontra pelo caminho — perde,
+  //                a cada um, a vida que esse inimigo tinha; quando a vida do
+  //                chefe invocado acaba, ele desaparece (ver ErenSummonSystem)
+  { id:'eren', name:'Eren', color:'#2a3a2a', hair:'#5a3a1a', arena:true,
+    cost:900, dmg:{punch:30,low:30,high:30,head:30}, spd:{punch:1,low:1,high:1,head:1}, special:'Titã', uses:Infinity, limit:1, kind:null, baseKind:null },
   // YAMI — sem progressão, colocação única. Limite 1 (único).
   // 150 dano · 1.5s · alcance do Goku COM up (661.5) · preço 2000
   { id:'yami', name:'Yami', color:'#1a1a2a', hair:'#1c1c1c', arena:true,
@@ -2051,7 +2147,7 @@ const CharacterAnime = {
   // Kuroko no Basket
   murasakibara: 'Kuroko no Basket',
   // One Punch Man
-  saitama: 'One Punch Man',
+  saitama: 'One Punch Man', garou: 'One Punch Man',
   // Solo Leveling
   sungjinwoo: 'Solo Leveling',
   // One Piece
@@ -2065,13 +2161,17 @@ const CharacterAnime = {
   // The Beginning After The End
   arthur: 'The Beginning After The End',
   // Hunter x Hunter
-  killua: 'Hunter x Hunter',
+  killua: 'Hunter x Hunter', meruem: 'Hunter x Hunter',
   // The Seven Deadly Sins (Nanatsu no Taizai)
   meliodas: 'The Seven Deadly Sins',
   // Black Clover
   asta: 'Black Clover', yuno: 'Black Clover', yami: 'Black Clover', julios: 'Black Clover',
+  // Tokyo Ghoul
+  kaneki: 'Tokyo Ghoul',
+  // Attack on Titan (Shingeki no Kyojin)
+  eren: 'Attack on Titan',
   // Sem anime (personagens originais do jogo, ou obras que não são anime):
-  // lanceiro, estudante, peppa, aang, kailany ficam de fora deste mapa —
+  // lanceiro, estudante, peppa, aang, kailany, pico ficam de fora deste mapa —
   // qualquer id ausente aqui é tratado como "sem anime" no agrupamento.
 };
 
@@ -2158,6 +2258,18 @@ Characters['urahara'].cost = 900;
 // Julios/Muzan/Zenitsu/Zaraki — o preço de colocação (200) é explícito e
 // não deve ser triplicado pela regra genérica de limite 1.
 Characters['aizen'].cost = 200;
+// GAROU: mesma razão do Guts/Rimuru/Arthur/Sukuna/Gojo/Kaido/Frezza/
+// Julios/Muzan/Zenitsu/Zaraki/Aizen/Urahara — o preço de colocação (1000)
+// é explícito e não deve ser triplicado pela regra genérica de limite 1.
+Characters['garou'].cost = 1000;
+// MERUEM: mesma razão do Guts/Rimuru/Arthur/Sukuna/Gojo/Kaido/Frezza/
+// Julios/Muzan/Zenitsu/Zaraki/Aizen/Urahara/Garou — o preço de colocação
+// (2500) é explícito e não deve ser triplicado pela regra genérica de limite 1.
+Characters['meruem'].cost = 2500;
+// EREN: mesma razão do Guts/Rimuru/Arthur/Sukuna/Gojo/Kaido/Frezza/Julios/
+// Muzan/Zenitsu/Zaraki/Aizen/Urahara/Garou/Meruem — o preço de colocação
+// (900) é explícito e não deve ser triplicado pela regra genérica de limite 1.
+Characters['eren'].cost = 900;
 // MAHORAGA — não está no ROSTER (nunca aparece na loja/barra); é invocado
 // automaticamente pelo SukunaSystem no up1 (Megumi), à semelhança do clone
 // do Naruto. Entrada mínima só para ArenaArt.makeSprite/drawFighter e afins.
@@ -2184,7 +2296,7 @@ const ShopPrices = {
   musashi:15, ayanokoji:10, goku:100, vegeta:100, tanjiro:20,
   meliodas:20, kira:50, murasakibara:15, saitama:150, sungjinwoo:50,
   luffy:100, zoro:75, itadori:50, yuta:75, guts:200, rimuru:100,
-  subaru:20, arthur:100, aang:20, estudante:10, sukuna:120, gojo:150, barbabranca:200, kaido:150, madara:100, obito:100, asta:75, yuno:75, yami:150, frezza:150, gohan:100, shidou:10, barou:10, julios:120, muzan:175, kokushibo:25, zenitsu:10, zaraki:250, aizen:100, ichigo:100, urahara:120,
+  subaru:20, arthur:100, aang:20, estudante:10, sukuna:120, gojo:150, barbabranca:200, kaido:150, madara:100, obito:100, asta:75, yuno:75, yami:150, frezza:150, gohan:100, shidou:10, barou:10, julios:120, muzan:175, kokushibo:25, zenitsu:10, zaraki:250, aizen:100, ichigo:100, urahara:120, kaneki:25, pico:10, garou:150, meruem:220, eren:250,
   verdade:10000,
 };
 // Personagens sempre gratuitos/desbloqueados desde o início
@@ -4151,6 +4263,154 @@ const Panel = {
       return;
     }
 
+    // KANEKI: painel próprio (limite 3 — é vendível)
+    if(h.type === 'kaneki'){
+      const cd = (h.cooldown/1000).toFixed(2);
+      const lvl = h.kanekiLevel || 0;
+      const atkName = lvl === 0 ? 'Kagune Vermelha' : 'Kagune Vermelha (Cabelo Branco)';
+      upgradeInfo.innerHTML =
+        `Ataque: <b>${atkName}</b><br>Dano ${h.flatDmg} · ${cd}s por golpe`;
+      upgradeBtn.style.display = '';
+      if(KanekiSystem.canUpgrade(h)){
+        const c = KanekiSystem.upgradeCostFor(h);
+        upgradeBtn.textContent = `⬆ Cabelo Branco (${c})`;
+        upgradeBtn.disabled = (State.money < c);
+      } else {
+        upgradeBtn.textContent = '✓ No máximo';
+        upgradeBtn.disabled = true;
+      }
+      specialBtn.classList.add('hidden');
+      // dots: 2 níveis
+      upgradeDots.innerHTML = '';
+      for(let d=0; d<2; d++){
+        const dot = document.createElement('div');
+        dot.className = 'dot' + (lvl >= d ? ' on' : '');
+        upgradeDots.appendChild(dot);
+      }
+      priorityBtn.disabled = false;
+      priorityBtn.textContent = (h.priority === 'last') ? '⬅ Último' : '➡ Primeiro';
+      if(!ch.sellable){
+        sellBtn.textContent = 'Não vendível'; sellBtn.disabled = true;
+      } else {
+        const refund = this.refundFor(h);
+        sellBtn.textContent = `Vender (+${refund})`;
+        sellBtn.disabled = !State.running;
+      }
+      return;
+    }
+
+    // GAROU: painel próprio (limite 1 — único em campo, não vendível)
+    if(h.type === 'garou'){
+      const cd = (h.cooldown/1000).toFixed(2);
+      const lvl = h.garouLevel || 0;
+      const atkName = lvl === 0 ? 'Golpe' : (lvl === 1 ? 'Golpe (Monstro)' : 'Golpe (Galáxia)');
+      const dmgTxt = (lvl === 2)
+        ? `Dano ${GarouSystem.previewDmg()} <span style="color:var(--ink-dim)">(chefes/rápidos: ${GarouSystem.LEVELS[1].dmg})</span>`
+        : `Dano ${h.flatDmg}`;
+      upgradeInfo.innerHTML =
+        `Ataque: <b>${atkName}</b><br>${dmgTxt} · ${cd}s por golpe`;
+      upgradeBtn.style.display = '';
+      if(GarouSystem.canUpgrade(h)){
+        const c = GarouSystem.upgradeCostFor(h);
+        const lblG = (lvl === 0) ? 'Monstro' : 'Galáxia';
+        upgradeBtn.textContent = `⬆ ${lblG} (${c})`;
+        upgradeBtn.disabled = (State.money < c);
+      } else {
+        upgradeBtn.textContent = '✓ No máximo';
+        upgradeBtn.disabled = true;
+      }
+      specialBtn.classList.add('hidden');
+      // dots: 3 níveis
+      upgradeDots.innerHTML = '';
+      for(let d=0; d<3; d++){
+        const dot = document.createElement('div');
+        dot.className = 'dot' + (lvl >= d ? ' on' : '');
+        upgradeDots.appendChild(dot);
+      }
+      priorityBtn.disabled = false;
+      priorityBtn.textContent = (h.priority === 'last') ? '⬅ Último' : '➡ Primeiro';
+      // Não vendível (limite 1)
+      sellBtn.textContent = 'Não vendível'; sellBtn.disabled = true;
+      return;
+    }
+
+    // EREN: painel próprio (limite 1 — único em campo, não vendível)
+    if(h.type === 'eren'){
+      const cd = (h.cooldown/1000).toFixed(2);
+      const lvl = h.erenLevel || 0;
+      const atkName = lvl === 0 ? 'Golpe' : (lvl === 1 ? 'Golpe (Titã de Ataque)' : 'Golpe (Fundador)');
+      upgradeInfo.innerHTML =
+        `Ataque: <b>${atkName}</b><br>Dano ${h.flatDmg} · ${cd}s por golpe`;
+      upgradeBtn.style.display = '';
+      if(ErenSystem.canUpgrade(h)){
+        const c = ErenSystem.upgradeCostFor(h);
+        const lblE = (lvl === 0) ? 'Titã de Ataque' : 'Fundador';
+        upgradeBtn.textContent = `⬆ ${lblE} (${c})`;
+        upgradeBtn.disabled = (State.money < c);
+      } else {
+        upgradeBtn.textContent = '✓ No máximo';
+        upgradeBtn.disabled = true;
+      }
+      // Botão de especial: invocar o chefe do round 50 (só no up2/Fundador, 3 usos)
+      if(lvl === 2){
+        specialBtn.classList.remove('hidden');
+        if(h.erenSummonUses > 0){
+          specialBtn.textContent = `⚡ Invocar Chefe (${h.erenSummonUses} usos)`;
+          specialBtn.classList.remove('ready');
+          specialBtn.disabled = false;
+        } else {
+          specialBtn.textContent = '⚡ Invocar Chefe (esgotado)';
+          specialBtn.classList.remove('ready');
+          specialBtn.disabled = true;
+        }
+      } else {
+        specialBtn.classList.add('hidden');
+      }
+      // dots: 3 níveis
+      upgradeDots.innerHTML = '';
+      for(let d=0; d<3; d++){
+        const dot = document.createElement('div');
+        dot.className = 'dot' + (lvl >= d ? ' on' : '');
+        upgradeDots.appendChild(dot);
+      }
+      priorityBtn.disabled = false;
+      priorityBtn.textContent = (h.priority === 'last') ? '⬅ Último' : '➡ Primeiro';
+      // Não vendível (limite 1)
+      sellBtn.textContent = 'Não vendível'; sellBtn.disabled = true;
+      return;
+    }
+
+    // MERUEM: painel próprio (limite 1 — único em campo, não vendível)
+    if(h.type === 'meruem'){
+      const cd = (h.cooldown/1000).toFixed(2);
+      const lvl = h.meruemLevel || 0;
+      const atkName = lvl === 0 ? 'Golpe' : 'Golpe (Rosa)';
+      upgradeInfo.innerHTML =
+        `Ataque: <b>${atkName}</b><br>Dano ${h.flatDmg} · ${cd}s por golpe`;
+      upgradeBtn.style.display = '';
+      if(MeruemSystem.canUpgrade(h)){
+        const c = MeruemSystem.upgradeCostFor(h);
+        upgradeBtn.textContent = `⬆ Rosa (${c})`;
+        upgradeBtn.disabled = (State.money < c);
+      } else {
+        upgradeBtn.textContent = '✓ No máximo';
+        upgradeBtn.disabled = true;
+      }
+      specialBtn.classList.add('hidden');
+      // dots: 2 níveis
+      upgradeDots.innerHTML = '';
+      for(let d=0; d<2; d++){
+        const dot = document.createElement('div');
+        dot.className = 'dot' + (lvl >= d ? ' on' : '');
+        upgradeDots.appendChild(dot);
+      }
+      priorityBtn.disabled = false;
+      priorityBtn.textContent = (h.priority === 'last') ? '⬅ Último' : '➡ Primeiro';
+      // Não vendível (limite 1)
+      sellBtn.textContent = 'Não vendível'; sellBtn.disabled = true;
+      return;
+    }
+
     // ASTA: painel próprio (limite 3 — é vendível)
     if(h.type === 'asta'){
       const cd = (h.cooldown/1000).toFixed(2);
@@ -4273,6 +4533,10 @@ const Panel = {
       ? (copiedCh || ch).dmg.punch * 2
       : (copiedCh || ch).dmg[h.attack]) * (h.dmgMult || 1);
     if(h.adaptive && h.type === 'saitama') dmgVal = h.saitamaDmg || dmgVal;
+    if(h.saitamaSerio && h.type === 'saitama'){
+      const frontE = EnemySystem.frontEnemy();
+      dmgVal = frontE ? frontE.hp : 0;
+    }
     if(h.flatDmg && h.flatDmg > 0) dmgVal = h.flatDmg;
     if(h.specialDmg && h.specialDmg > 0) dmgVal = h.specialDmg + ' (especial)';
     upgradeInfo.innerHTML =
@@ -4621,6 +4885,30 @@ const Panel = {
     // ÓBITO tem progressão própria (kunai -> lança branca/Raiva -> esfera negra/Jubi)
     if(h.type === 'obito'){
       ObitoSystem.tryUpgrade(h);
+      return;
+    }
+
+    // KANEKI tem progressão própria (kagune vermelha -> Cabelo Branco)
+    if(h.type === 'kaneki'){
+      KanekiSystem.tryUpgrade(h);
+      return;
+    }
+
+    // GAROU tem progressão própria (golpe -> Monstro -> Galáxia)
+    if(h.type === 'garou'){
+      GarouSystem.tryUpgrade(h);
+      return;
+    }
+
+    // MERUEM tem progressão própria (golpe -> Rosa)
+    if(h.type === 'meruem'){
+      MeruemSystem.tryUpgrade(h);
+      return;
+    }
+
+    // EREN tem progressão própria (golpe -> Titã de Ataque -> Fundador)
+    if(h.type === 'eren'){
+      ErenSystem.tryUpgrade(h);
       return;
     }
 
@@ -4974,7 +5262,7 @@ const Panel = {
     color = color || 'yellow';
     h._auraColor = color;
     h.el.classList.add('hasAura', 'aura-' + color);
-    ['yellow','red','blue','lightblue','purple','graywhite','pink'].forEach(c => { if(c !== color) h.el.classList.remove('aura-'+c); });
+    ['yellow','red','blue','lightblue','purple','graywhite','pink','darkgreen'].forEach(c => { if(c !== color) h.el.classList.remove('aura-'+c); });
     if(!h.auraEl){
       const aura = document.createElement('div');
       aura.className = 'goku-aura';
@@ -4983,7 +5271,7 @@ const Panel = {
       game.appendChild(aura);
       h.auraEl = aura;
     }
-    h.auraEl.classList.remove('aura-yellow','aura-red','aura-blue','aura-lightblue','aura-purple','aura-graywhite','aura-pink');
+    h.auraEl.classList.remove('aura-yellow','aura-red','aura-blue','aura-lightblue','aura-purple','aura-graywhite','aura-pink','aura-darkgreen');
     h.auraEl.classList.add('aura-' + color);
   },
 };
@@ -5030,6 +5318,12 @@ Panel.doSpecial = function(){
   // não depende de alvo/projétil.
   if(h.type === 'aizen'){
     AizenSystem.activateFreeze(h);
+    return;
+  }
+  // EREN (up2/Fundador): invoca o chefe do round 50 como aliado (3 usos),
+  // instantâneo, não depende de alvo/projétil.
+  if(h.type === 'eren'){
+    ErenSystem.activateSummon(h);
     return;
   }
   // YUNO (up1/Anjo): teleporta todos os inimigos para o início do mapa (1 vez),
@@ -5804,6 +6098,9 @@ const MahoragaSystem = {
       arthurLevel: 0, dragonForm: false,
       sukunaLevel: 0,
     };
+    // Torna o Mahoraga selecionável (para ver o painel com o dano ao vivo),
+    // à semelhança dos demais heróis — mas sem entrar em modo de colocação.
+    el.addEventListener('click', (ev) => { ev.stopPropagation(); HeroSystem.select(cloneHero); });
     State.heroes.push(cloneHero);
     this.minions.push({ owner: sukuna, cloneHero });
   },
@@ -7225,6 +7522,412 @@ const ObitoSystem = {
 };
 
 /* ============================================================
+   MÓDULO: KanekiSystem — progressão própria do Kaneki (à
+   semelhança do Madara/Óbito). Limite 3 (não é único: preço
+   NÃO é triplicado, e é vendível).
+   Níveis:
+     0 (colocação)      : 25 dano · 0.9s · alcance do Goku SEM up (378)   · preço 600 ·
+                          kagunes vermelhas
+     1 (Cabelo Branco)  : 90 dano · 1.5s · alcance do Goku COM up (661.5) · preço 2500 ·
+                          cabelo fica branco; continua a atacar com kagunes vermelhas
+   ============================================================ */
+const KanekiSystem = {
+  LEVELS: [
+    { dmg:25, cd:900,  kind:'redkagune', range:378   },
+    { dmg:90, cd:1500, kind:'redkagune', range:661.5 },
+  ],
+  UP_COST: { 0:2500 },   // custo para passar de nível 0->1 (Cabelo Branco)
+
+  // Aplica os stats de um nível ao herói do Kaneki (sem trocar de personagem)
+  applyLevel(h, level){
+    const L = this.LEVELS[level];
+    h.kanekiLevel = level;
+    h.attack = 'punch';
+    h.kind = L.kind;
+    h.baseKind = L.kind;        // o ataque base usa este projétil
+    Characters[h.type].baseKind = L.kind;  // para o _throw usar o kind correto
+    h.flatDmg = L.dmg;
+    h.dmgMult = 1;
+    h.cooldown = L.cd;
+    h.rangeOverridePx = L.range;
+    h.kanekiWhiteHair = (level === 1);  // visual: cabelo fica branco
+    h.upgraded = (level >= 1);  // marca como "upgraded" para efeitos de anel
+    if(level >= 1) this._setBadgeLevel(h, level);
+    if(h.arena && h.el.getContext){
+      ArenaArt.drawFighter(h.el.getContext('2d'), Characters[h.type], 0, { kanekiWhiteHair: h.kanekiWhiteHair });
+    }
+    if(State.selectedHero === h) MurasakiRange.showRing(h);
+  },
+
+  _setBadgeLevel(h, level){
+    let badge = h.el.querySelector('.upgradeBadge');
+    if(!badge){
+      badge = document.createElement('div');
+      badge.className = 'upgradeBadge';
+      h.el.appendChild(badge);
+    }
+    badge.textContent = '★';
+    badge.title = 'Cabelo Branco';
+  },
+
+  // Pode ainda receber upgrade? (nível 0; o nível 1 é o final)
+  canUpgrade(h){
+    if(!h || h.type !== 'kaneki') return false;
+    return h.kanekiLevel < 1;
+  },
+
+  upgradeCostFor(h){ return this.UP_COST[h.kanekiLevel] ?? 0; },
+
+  // Tenta dar o upgrade ao Kaneki selecionado (chamado pelo botão de upgrade)
+  tryUpgrade(h){
+    if(!this.canUpgrade(h)) return;
+    const cost = this.upgradeCostFor(h);
+    if(!Money.spend(cost)) return;
+    h.invested += cost;
+    this.applyLevel(h, h.kanekiLevel + 1);
+    Panel.render();
+  },
+};
+
+/* ============================================================
+   MÓDULO: GarouSystem — progressão própria do Garou. Limite 1
+   (único em campo: preço NÃO é triplicado — ver override manual
+   — e não é vendível). Ataque corpo-a-corpo, sem projétil (kind:null).
+   Níveis:
+     0 (colocação) : 50 dano  · 0.50s · alcance do Goku SEM up (378)              · preço 1000
+     1 (Monstro)   : 150 dano · 1s    · alcance do Goku COM up (661.5)            · preço 3500
+     2 (Galáxia)   : dano DINÂMICO = vida que os inimigos tinham no ROUND
+                     ANTERIOR (round 1 = 0 dano, sem round anterior)
+                     (contra chefes/inimigos rápidos usa o dano fixo do Monstro,
+                     150 — ver dmgFor(), aplicado em HeroSystem._throw)
+                     · 2.20s · alcance do Goku COM up +0.25× (826.875) · preço 4500
+   ============================================================ */
+const GarouSystem = {
+  LEVELS: [
+    { dmg:50,  cd:500,  range:378     },
+    { dmg:150, cd:1000, range:661.5   },
+    { dmg:0,   cd:2200, range:826.875, galaxy:true },  // dano real: dmgFor() (dinâmico)
+  ],
+  UP_COST: { 0:3500, 1:4500 },   // custo para passar de nível 0->1 (Monstro) e 1->2 (Galáxia)
+
+  // Aplica os stats de um nível ao herói do Garou (sem trocar de personagem)
+  applyLevel(h, level){
+    const L = this.LEVELS[level];
+    h.garouLevel = level;
+    h.attack = 'punch';
+    h.kind = null;
+    h.baseKind = null;
+    h.flatDmg = L.dmg;           // nível 2: placeholder — o dano real vem de dmgFor() (dinâmico)
+    h.dmgMult = 1;
+    h.cooldown = L.cd;
+    h.rangeOverridePx = L.range;
+    h.garouGalaxy = !!L.galaxy;  // nível 2: ativa o dano dinâmico em HeroSystem._throw
+    h.garouMonster = (level === 1);  // visual: corpo totalmente preto
+    h.upgraded = (level >= 1);   // marca como "upgraded" para efeitos de anel
+    if(level >= 1) this._setBadgeLevel(h, level);
+    // aura: vermelha no Monstro, roxa (cósmica) na Galáxia
+    if(level === 1) Panel._setAura(h, 'red');
+    else if(level === 2) Panel._setAura(h, 'purple');
+    if(h.arena && h.el.getContext){
+      ArenaArt.drawFighter(h.el.getContext('2d'), Characters[h.type], 0, { garouMonster: h.garouMonster, garouGalaxy: h.garouGalaxy });
+    }
+    if(State.selectedHero === h) MurasakiRange.showRing(h);
+  },
+
+  _setBadgeLevel(h, level){
+    let badge = h.el.querySelector('.upgradeBadge');
+    if(!badge){
+      badge = document.createElement('div');
+      badge.className = 'upgradeBadge';
+      h.el.appendChild(badge);
+    }
+    badge.textContent = (level === 1) ? '★' : '★★';
+    badge.title = (level === 1) ? 'Monstro' : 'Galáxia';
+  },
+
+  // Pode ainda receber upgrade? (níveis 0 e 1; o nível 2 é o final)
+  canUpgrade(h){
+    if(!h || h.type !== 'garou') return false;
+    return h.garouLevel < 2;
+  },
+
+  upgradeCostFor(h){ return this.UP_COST[h.garouLevel] ?? 0; },
+
+  // Tenta dar o upgrade ao Garou selecionado (chamado pelo botão de upgrade)
+  tryUpgrade(h){
+    if(!this.canUpgrade(h)) return;
+    const cost = this.upgradeCostFor(h);
+    if(!Money.spend(cost)) return;
+    h.invested += cost;
+    this.applyLevel(h, h.garouLevel + 1);
+    Panel.render();
+  },
+
+  // Dano dinâmico do nível 2 (Galáxia): igual à vida que os inimigos tinham
+  // no ROUND ANTERIOR (ex.: round 1 os inimigos têm 100 de vida => Garou dá
+  // 0 nesse round; no round 2, os inimigos têm 105 => Garou dá 100, que era
+  // a vida do round 1). No round 1 (sem round anterior) o dano é 0.
+  // Contra chefes e inimigos rápidos, usa o dano fixo do Monstro (nível 1)
+  // em vez de escalar com a vida do round anterior.
+  // Dano contra um inimigo NORMAL (nem chefe, nem rápido): vida que os
+  // inimigos comuns tinham no round anterior (0 se não houver round anterior).
+  // Usado tanto no cálculo real do dano quanto na pré-visualização do painel.
+  previewDmg(){
+    const prevRound = (State.round || 1) - 1;
+    if(prevRound < 1) return 0;
+    return Math.max(0, EnemySystem.hpForRound(prevRound));
+  },
+
+  dmgFor(h, target){
+    if(target && (target.boss || target.fast)) return this.LEVELS[1].dmg;
+    return this.previewDmg();
+  },
+};
+
+/* ============================================================
+   MÓDULO: MeruemSystem — progressão própria do Meruem. Limite 1
+   (único em campo: preço NÃO é triplicado — ver override manual
+   — e não é vendível). Ataque corpo-a-corpo, sem projétil (kind:null).
+   Alcance não especificado no enunciado; assumido como o alcance
+   do Goku COM up (661.5) em ambos os níveis.
+   Níveis:
+     0 (colocação) : 120 dano · 1s   · alcance do Goku COM up (661.5) · preço 2500
+     1 (Rosa)      : 900 dano · 0.5s · alcance do Goku COM up (661.5) · preço 9000 ·
+                     corpo, cabelo e pele ficam totalmente rosa
+   ============================================================ */
+const MeruemSystem = {
+  LEVELS: [
+    { dmg:120, cd:1000, range:661.5, kind:null       },
+    { dmg:900, cd:500,  range:661.5, kind:'pinkball' },
+  ],
+  UP_COST: { 0:9000 },   // custo para passar de nível 0->1 (Rosa)
+
+  // Aplica os stats de um nível ao herói do Meruem (sem trocar de personagem)
+  applyLevel(h, level){
+    const L = this.LEVELS[level];
+    h.meruemLevel = level;
+    h.attack = 'punch';
+    h.kind = L.kind;
+    h.baseKind = L.kind;
+    Characters[h.type].baseKind = L.kind;  // para o _throw usar o kind correto
+    h.flatDmg = L.dmg;
+    h.dmgMult = 1;
+    h.cooldown = L.cd;
+    h.rangeOverridePx = L.range;
+    h.upgraded = (level >= 1);     // marca como "upgraded" para efeitos de anel
+    if(level >= 1) this._setBadgeLevel(h, level);
+    // up1 (Rosa): ataque vira uma bola rosa + ganha aura verde escuro (o
+    // corpo do Meruem NÃO muda de cor)
+    if(level === 1) Panel._setAura(h, 'darkgreen');
+    if(State.selectedHero === h) MurasakiRange.showRing(h);
+  },
+
+  _setBadgeLevel(h, level){
+    let badge = h.el.querySelector('.upgradeBadge');
+    if(!badge){
+      badge = document.createElement('div');
+      badge.className = 'upgradeBadge';
+      h.el.appendChild(badge);
+    }
+    badge.textContent = '★';
+    badge.title = 'Rosa';
+  },
+
+  // Pode ainda receber upgrade? (nível 0; o nível 1 é o final)
+  canUpgrade(h){
+    if(!h || h.type !== 'meruem') return false;
+    return h.meruemLevel < 1;
+  },
+
+  upgradeCostFor(h){ return this.UP_COST[h.meruemLevel] ?? 0; },
+
+  // Tenta dar o upgrade ao Meruem selecionado (chamado pelo botão de upgrade)
+  tryUpgrade(h){
+    if(!this.canUpgrade(h)) return;
+    const cost = this.upgradeCostFor(h);
+    if(!Money.spend(cost)) return;
+    h.invested += cost;
+    this.applyLevel(h, h.meruemLevel + 1);
+    Panel.render();
+  },
+};
+
+/* ============================================================
+   MÓDULO: ErenSystem — progressão própria do Eren. Limite 1
+   (único em campo: preço NÃO é triplicado — ver override manual
+   — e não é vendível). Ataque corpo-a-corpo, sem projétil (kind:null).
+   Alcance não especificado no enunciado; assumido como o alcance
+   do Goku COM up (661.5) em todos os níveis.
+   Níveis:
+     0 (colocação)        : 30 dano   · 1s · alcance do Goku COM up (661.5) · preço 900
+     1 (Titã de Ataque)   : 250 dano  · 1s · alcance igual                  · preço 4000 ·
+                            fica maior e com os olhos verdes
+     2 (Fundador)         : 1800 dano · 2s · alcance igual                  · preço 12000 ·
+                            ganha o Especial (3 usos): invoca 1 chefe do
+                            round 50 (aliado) — ver ErenSummonSystem
+   ============================================================ */
+const ErenSystem = {
+  LEVELS: [
+    { dmg:30,   cd:1000, range:661.5, big:false },
+    { dmg:250,  cd:1000, range:661.5, big:true  },
+    { dmg:1800, cd:2000, range:661.5, big:true  },
+  ],
+  UP_COST: { 0:4000, 1:12000 },   // custo para passar de nível 0->1 (Titã) e 1->2 (Fundador)
+  SUMMON_USES: 3,
+
+  // Aplica os stats de um nível ao herói do Eren (sem trocar de personagem)
+  applyLevel(h, level){
+    const L = this.LEVELS[level];
+    h.erenLevel = level;
+    h.attack = 'punch';
+    h.kind = null;
+    h.baseKind = null;
+    h.flatDmg = L.dmg;
+    h.dmgMult = 1;
+    h.cooldown = L.cd;
+    h.rangeOverridePx = L.range;
+    h.erenTitan = !!L.big;   // visual: maior e com olhos verdes (up1 e up2)
+    h.upgraded = (level >= 1);   // marca como "upgraded" para efeitos de anel
+    if(level >= 1) this._setBadgeLevel(h, level);
+    if(h.arena && h.el){
+      h.el.classList.toggle('big-hero', h.erenTitan);
+      if(h.el.getContext) ArenaArt.drawFighter(h.el.getContext('2d'), Characters[h.type], 0, { erenTitan: h.erenTitan });
+    }
+    // FUNDADOR (up2): ganha 3 usos do Especial (só uma vez, na primeira
+    // vez que chega a este nível).
+    if(level === 2 && !h._erenSummonGranted){
+      h._erenSummonGranted = true;
+      h.erenSummonUses = this.SUMMON_USES;
+    }
+    if(State.selectedHero === h) MurasakiRange.showRing(h);
+  },
+
+  _setBadgeLevel(h, level){
+    let badge = h.el.querySelector('.upgradeBadge');
+    if(!badge){
+      badge = document.createElement('div');
+      badge.className = 'upgradeBadge';
+      h.el.appendChild(badge);
+    }
+    badge.textContent = (level === 1) ? '★' : '★★';
+    badge.title = (level === 1) ? 'Titã de Ataque' : 'Fundador';
+  },
+
+  // Pode ainda receber upgrade? (níveis 0 e 1; o nível 2 é o final)
+  canUpgrade(h){
+    if(!h || h.type !== 'eren') return false;
+    return h.erenLevel < 2;
+  },
+
+  upgradeCostFor(h){ return this.UP_COST[h.erenLevel] ?? 0; },
+
+  // Tenta dar o upgrade ao Eren selecionado (chamado pelo botão de upgrade)
+  tryUpgrade(h){
+    if(!this.canUpgrade(h)) return;
+    const cost = this.upgradeCostFor(h);
+    if(!Money.spend(cost)) return;
+    h.invested += cost;
+    this.applyLevel(h, h.erenLevel + 1);
+    Panel.render();
+  },
+
+  // Ativa o Especial (só no up2/Fundador, 3 usos, instantâneo): invoca o
+  // chefe gigante do round 50 como aliado (ver ErenSummonSystem).
+  activateSummon(h){
+    if(h.erenLevel < 2 || !(h.erenSummonUses > 0)) return;
+    h.erenSummonUses--;
+    ErenSummonSystem.spawn(h);
+    Panel.render();
+  },
+};
+
+/* ============================================================
+   MÓDULO: ErenSummonSystem — o chefe gigante do round 50 que o
+   Eren (Fundador) invoca como aliado. Nasce na base e anda pelo
+   caminho até o início (sentido inverso ao dos inimigos). Ao
+   "passar por cima" de um inimigo vivo no caminho, mata-o e perde,
+   ele próprio, a vida que esse inimigo tinha. Quando a vida do
+   chefe invocado chega a zero (ou ele alcança o início do
+   caminho), desaparece.
+   ============================================================ */
+const ErenSummonSystem = {
+  active: [],   // lista de invocações vivas: {el, bar, dist, pathId, hp, maxHp, owner}
+
+  spawn(owner){
+    const pathId = 'A';
+    const path = pathFor(pathId);
+    const el = buildStick('enemy');
+    el.classList.add('boss', 'mega-boss', 'eren-summon');
+
+    const drag = document.createElement('div');
+    drag.className = 'dragged-corpse';
+    el.appendChild(drag);
+    const scarf = document.createElement('div');
+    scarf.className = 'mega-scarf';
+    el.appendChild(scarf);
+
+    const bar = document.createElement('div');
+    bar.className = 'hpbar';
+    bar.innerHTML = '<i></i>';
+    el.appendChild(bar);
+
+    const tag = document.createElement('div');
+    tag.className = 'bosstag';
+    tag.textContent = 'CHEFE GIGANTE (ALIADO)';
+    el.appendChild(tag);
+
+    const maxHp = EnemySystem.bossHP(50);
+    const dist = path.totalLen;   // começa na base (fim do caminho)
+    const p = path.pointAt(dist);
+    el.style.left = p.x + '%'; el.style.top = p.y + '%';
+    game.appendChild(el);
+
+    this.active.push({ el, bar, dist, pathId, hp: maxHp, maxHp, owner });
+  },
+
+  update(dt){
+    if(!this.active.length || !State.map) return;
+    const baseMove = State.map.enemySpeedPctPerSec * (dt/1000);
+    const threshold = Math.max(baseMove, 1.2);
+    for(let i = this.active.length - 1; i >= 0; i--){
+      const s = this.active[i];
+      const path = pathFor(s.pathId);
+      s.dist = Math.max(0, s.dist - baseMove);
+      const p = path.pointAt(s.dist);
+      s.el.style.left = p.x + '%'; s.el.style.top = p.y + '%';
+
+      // "Passa por cima" de inimigos vivos no mesmo caminho: mata-os e
+      // perde, ele próprio, a vida que cada um tinha.
+      for(const e of State.enemies){
+        if(!e.alive || e.pathId !== s.pathId) continue;
+        if(Math.abs(e.dist - s.dist) <= threshold){
+          const lost = e.hp;
+          EnemySystem.hit(e, e.hp, null, null, false);
+          s.hp -= lost;
+          if(s.hp <= 0) break;
+        }
+      }
+
+      if(s.bar && s.bar.firstChild){
+        s.bar.firstChild.style.width = Math.max(0, (s.hp / s.maxHp) * 100) + '%';
+      }
+
+      // Vida esgotada ou chegou ao início do caminho: desaparece.
+      if(s.hp <= 0 || s.dist <= 0){
+        s.el.remove();
+        this.active.splice(i, 1);
+      }
+    }
+  },
+
+  // Remove todas as invocações (ex.: fim/reinício da partida)
+  reset(){
+    this.active.forEach(s => s.el.remove());
+    this.active = [];
+  },
+};
+
+/* ============================================================
    MÓDULO: AstaSystem — progressão própria do Asta (à
    semelhança do Madara/Óbito). Limite 3 (não é único: preço
    NÃO é triplicado, e é vendível).
@@ -7454,6 +8157,8 @@ const ArenaArt = {
     if(opts.jubiForm && ch.id === 'obito') skin = '#ffffff';   // Jubi (up2): pele (incl. tronco) fica realmente branca
     if(opts.zarakiBankai && ch.id === 'zaraki') skin = '#c81818';  // Bankai: pele toda vermelha (sem camisa)
     if(opts.ichigoVasto && ch.id === 'ichigo') skin = '#ffffff';   // Vasto Lorde: rosto todo branco
+    if(opts.garouMonster && ch.id === 'garou') skin = '#0a0a0a';  // Monstro (up1): fica totalmente preto
+    if(opts.garouGalaxy && ch.id === 'garou') skin = '#0d1b3a';   // Galáxia (up2): fica totalmente azul escuro
     const w = ctx.canvas.width, h = ctx.canvas.height;
     ctx.clearRect(0,0,w,h);
     ctx.save();
@@ -7479,6 +8184,9 @@ const ArenaArt = {
              : (opts.muzanFinal && ch.id === 'muzan') ? { ...ch, color:'#c81818', hair:'#f5f5f0' }
              : (opts.ichigoMugetsu && ch.id === 'ichigo') ? { ...ch, color:'#f5f5f0', hair:'#141414' }
              : (opts.ichigoVasto && ch.id === 'ichigo') ? { ...ch, color:'#f5f5f0' }
+             : (opts.kanekiWhiteHair && ch.id === 'kaneki') ? { ...ch, hair:'#f5f5f0' }
+             : (opts.garouMonster && ch.id === 'garou') ? { ...ch, color:'#0a0a0a', hair:'#0a0a0a' }
+             : (opts.garouGalaxy && ch.id === 'garou') ? { ...ch, color:'#0d1b3a', hair:'#0d1b3a' }
              : ch;
     const prog = throwT;              // 0..1
     const torsoTop = -110, hip = -56, legLen = 56;
@@ -7491,12 +8199,13 @@ const ArenaArt = {
     ctx.beginPath(); ctx.ellipse(0,4,34,9,0,0,7); ctx.fill();
 
     // pernas (Estudante e Kailany usam calça azul; o Amor usa calça preta; o Barba Branca usa calça branca;
-    // o Óbito no Jubi usa calça cinza clara; o Yuno usa calça castanha)
+    // o Óbito no Jubi usa calça cinza clara; o Yuno usa calça castanha; o Pico usa calção azul)
     ctx.strokeStyle = (d.id==='estudante'||d.id==='kailany') ? '#2f4ca8'
                     : (d.id==='kailanyamor') ? '#111'
                     : (d.id==='barbabranca') ? '#f0f0f0'
                     : (opts.jubiForm && d.id==='obito') ? '#d8d8d0'
                     : (d.id==='yuno') ? '#8a6a4a'
+                    : (d.id==='pico') ? '#2f6fd6'
                     : (d.id==='ichigo' && (opts.ichigoVasto || opts.ichigoMugetsu)) ? '#141414'
                     : (d.id==='verdade') ? '#ffffff'
                     : this._dark(d.color);
@@ -7533,7 +8242,7 @@ const ArenaArt = {
       ctx.lineTo(13,torsoTop); ctx.lineTo(-13,torsoTop); ctx.closePath(); ctx.fill();
     }
     // cinto (mantém-se, marca a calça)
-    ctx.fillStyle = (d.id==='verdade') ? '#ffffff' : this._dark(d.color);
+    ctx.fillStyle = (d.id==='verdade') ? '#ffffff' : (d.id==='pico') ? '#2f6fd6' : this._dark(d.color);
     ctx.fillRect(-16,hip-6,32,7);
 
     // braços (o da frente avança com o ataque)
@@ -7596,12 +8305,16 @@ const ArenaArt = {
       ctx.beginPath(); ctx.moveTo(0,torsoTop-30); ctx.lineTo(-5,torsoTop-20); ctx.lineTo(5,torsoTop-20); ctx.closePath(); ctx.fill();
       ctx.fillRect(-1.5,torsoTop-22,3,8);
     }
-    // olhos (Guts na Armadura Berserker: brilho vermelho; resto do rosto coberto)
+    // olhos (Guts na Armadura Berserker: brilho vermelho; resto do rosto coberto;
+    // Eren no Titã de Ataque/Fundador: olhos verdes)
     if(d.id === 'guts' && opts.armorForm){
       ctx.fillStyle = 'rgba(255,30,30,.45)';
       ctx.beginPath(); ctx.arc(4.5, torsoTop-16, 5, 0, 7); ctx.fill();
       ctx.fillStyle = '#ff2020';
       ctx.beginPath(); ctx.arc(4.5, torsoTop-16, 2.4, 0, 7); ctx.fill();
+    } else if(d.id === 'eren' && opts.erenTitan){
+      ctx.fillStyle = '#2ecc40';
+      ctx.fillRect(4, torsoTop-16, 3, 3);
     } else {
       ctx.fillStyle='#1a1a1a'; ctx.fillRect(4,torsoTop-16,3,3);
     }
@@ -8106,6 +8819,62 @@ const ArenaArt = {
       ctx.fillStyle='#3a2410'; ctx.fillRect(-5,-3.5,2,7);  // guarda
       return;
     }
+    if(kind==='redkagune'){
+      // kagune vermelha do Kaneki: tentáculo orgânico e pontiagudo
+      ctx.rotate(t*0.35); ctx.scale(dir,1);
+      ctx.fillStyle='#a4141c';
+      ctx.beginPath();
+      ctx.moveTo(-6,-3.5);
+      ctx.quadraticCurveTo(8,-7, 19,-2);
+      ctx.quadraticCurveTo(25,0,19,2);
+      ctx.quadraticCurveTo(8,7,-6,3.5);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle='#5c0a10'; ctx.lineWidth=1; ctx.stroke();
+      // ponta afiada, mais escura
+      ctx.fillStyle='#7a0d13';
+      ctx.beginPath();
+      ctx.moveTo(17,-2); ctx.lineTo(27,0); ctx.lineTo(17,2);
+      ctx.closePath(); ctx.fill();
+      // segmentos escuros (textura orgânica do kagune)
+      ctx.strokeStyle='rgba(20,0,0,.5)'; ctx.lineWidth=1;
+      for(let i=-1;i<=1;i++){
+        ctx.beginPath(); ctx.moveTo(-4+i*7,-3); ctx.lineTo(-2+i*7,3); ctx.stroke();
+      }
+      return;
+    }
+    if(kind==='iceshard'){
+      // estilhaço de gelo do Pico: cristal azulado, translúcido, a girar
+      ctx.rotate(t*0.4); ctx.scale(dir,1);
+      const grd = ctx.createLinearGradient(-10,0,16,0);
+      grd.addColorStop(0,'#dff5fb'); grd.addColorStop(.5,'#8fd6ec'); grd.addColorStop(1,'#3aa0c8');
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.moveTo(-10,-3); ctx.lineTo(6,-6); ctx.lineTo(16,0); ctx.lineTo(6,6); ctx.lineTo(-10,3);
+      ctx.lineTo(-4,0);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth=1; ctx.stroke();
+      // brilho interno
+      ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(-4,-1); ctx.lineTo(9,-2); ctx.stroke();
+      // fagulhas geladas
+      ctx.fillStyle = 'rgba(220,248,255,.8)';
+      for(let i=0;i<3;i++){
+        const a = t*0.3 + i*2.1;
+        ctx.beginPath(); ctx.arc(Math.cos(a)*11, Math.sin(a)*5, 1.3, 0, 7); ctx.fill();
+      }
+      return;
+    }
+    if(kind==='pinkball'){
+      // bola de Nen rosa do Meruem (up1/Rosa)
+      const rr = 12 + Math.sin(t*0.45)*2;
+      const grd = ctx.createRadialGradient(0,0,2,0,0,rr);
+      grd.addColorStop(0,'#ffe6f4'); grd.addColorStop(.5,'#ff6fc0'); grd.addColorStop(1,'rgba(160,20,110,.08)');
+      ctx.fillStyle = grd;
+      ctx.beginPath(); ctx.arc(0,0,rr,0,7); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.arc(0,0,rr*0.65,0,7); ctx.stroke();
+      return;
+    }
     if(kind==='redspear' || kind==='beigespear' || kind==='whitespear'){
       // lança a girar: ponta vermelha (Sukuna base/Megumi), bege (Sukuna Completo)
       // ou branca (Óbito up1/Raiva)
@@ -8453,6 +9222,11 @@ const RangeSystem = {
     aizen:         378,   // fallback (o valor real vem sempre de rangeOverridePx via AizenSystem)
     ichigo:        378,   // fallback (o valor real vem sempre de rangeOverridePx via IchigoSystem)
     urahara:       661.5, // fallback (o valor real vem sempre de rangeOverridePx via UraharaSystem)
+    kaneki:        378,   // fallback (o valor real vem sempre de rangeOverridePx via KanekiSystem)
+    pico:          189,   // alcance igual ao do Murasakibara sem up (fixo — sem progressão de upgrade)
+    garou:         378,   // fallback (o valor real vem sempre de rangeOverridePx via GarouSystem)
+    meruem:        661.5, // fallback (o valor real vem sempre de rangeOverridePx via MeruemSystem)
+    eren:          661.5, // fallback (o valor real vem sempre de rangeOverridePx via ErenSystem)
     verdade:       9999,  // alcance igual ao do Lanceiro: todo o mapa
   },
 
@@ -8956,6 +9730,22 @@ const HeroSystem = {
     if(type === 'obito'){
       ObitoSystem.applyLevel(hero, 0);
     }
+    // KANEKI: começa no nível 0 (kagune vermelha). Aplica já os stats próprios.
+    if(type === 'kaneki'){
+      KanekiSystem.applyLevel(hero, 0);
+    }
+    // GAROU: começa no nível 0 (golpe). Aplica já os stats próprios.
+    if(type === 'garou'){
+      GarouSystem.applyLevel(hero, 0);
+    }
+    // MERUEM: começa no nível 0 (golpe). Aplica já os stats próprios.
+    if(type === 'meruem'){
+      MeruemSystem.applyLevel(hero, 0);
+    }
+    // EREN: começa no nível 0 (golpe). Aplica já os stats próprios.
+    if(type === 'eren'){
+      ErenSystem.applyLevel(hero, 0);
+    }
     // ASTA: começa no nível 0 (espada gigante). Aplica já os stats próprios.
     if(type === 'asta'){
       AstaSystem.applyLevel(hero, 0);
@@ -9042,7 +9832,7 @@ const HeroSystem = {
           h.throwAnim = Math.max(0, h.throwAnim - dt/180);
           const ctx = h.el.getContext('2d');
           const drawCh = h.drawAs ? Characters[h.drawAs] : Characters[h.type];
-          ArenaArt.drawFighter(ctx, drawCh, h.throwAnim, { shirtless: !!h.shirtless, gear5Luffy: !!h.gear5Look, wanoForm: !!h.wanoForm, armorForm: !!h.armorForm, dragonForm: !!h.dragonForm, blackHair: !!h.blackHair, jubiForm: !!h.jubiForm, frezzaGold: !!h.frezzaGold, frezzaBlack: !!h.frezzaBlack, gohanBeast: !!h.gohanBeast, juliosBlackHair: !!h.juliosBlackHair, muzanFinal: !!h.muzanFinal, ichigoVasto: !!h.ichigoVasto, ichigoMugetsu: !!h.ichigoMugetsu, zarakiBankai: !!h.zarakiBankai });
+          ArenaArt.drawFighter(ctx, drawCh, h.throwAnim, { shirtless: !!h.shirtless, gear5Luffy: !!h.gear5Look, wanoForm: !!h.wanoForm, armorForm: !!h.armorForm, dragonForm: !!h.dragonForm, blackHair: !!h.blackHair, jubiForm: !!h.jubiForm, frezzaGold: !!h.frezzaGold, frezzaBlack: !!h.frezzaBlack, gohanBeast: !!h.gohanBeast, juliosBlackHair: !!h.juliosBlackHair, muzanFinal: !!h.muzanFinal, ichigoVasto: !!h.ichigoVasto, ichigoMugetsu: !!h.ichigoMugetsu, zarakiBankai: !!h.zarakiBankai, kanekiWhiteHair: !!h.kanekiWhiteHair, garouMonster: !!h.garouMonster, garouGalaxy: !!h.garouGalaxy, erenTitan: !!h.erenTitan });
         }
       }
       // BAKI (up2): contra chefes/rápidos ataca 5× mais forte e a cada 0.25s;
@@ -9176,6 +9966,19 @@ const HeroSystem = {
     // contra CHEFES mantém o dano normal (a adaptação não se aplica a chefes).
     if(h.adaptive && h.type === 'saitama' && target && !target.boss){
       dmg = h.saitamaDmg || dmg;
+    }
+
+    // SAITAMA "SÉRIO" (após o evento com o Garou no máximo): dano = vida
+    // ATUAL do alvo (inclui chefes) — sempre um golpe fatal.
+    if(h.saitamaSerio && h.type === 'saitama' && target){
+      dmg = target.hp;
+    }
+
+    // GAROU (Galáxia, up2): dano dinâmico = vida que os inimigos tinham no
+    // round anterior; contra chefes e inimigos rápidos usa o dano fixo do
+    // Monstro (up1) em vez de escalar com o round anterior.
+    if(h.type === 'garou' && h.garouGalaxy && target){
+      dmg = GarouSystem.dmgFor(h, target);
     }
 
     // LUFFY — Raio (Gear 5): especial limitado, 500 dmg, consome 1 uso.
@@ -9582,6 +10385,82 @@ const FusionSystem = {
 };
 
 /* ============================================================
+   MÓDULO: SaitamaSerioSystem — evento automático (1x/partida):
+   quando o Garou está no máximo (Galáxia, nível 2) e o Saitama
+   está no máximo (Soco Adaptativo, upgraded2) em campo ao mesmo
+   tempo, surge a mensagem "Agora me verão sério..." por 5s.
+   Depois: o Garou sai do mapa (como se fosse vendido, mas SEM
+   devolver dinheiro) e o Saitama passa a dar dano igual à vida
+   atual do inimigo (inclui chefes — sempre um golpe fatal) e
+   ataca a cada 1 segundo.
+   ============================================================ */
+const SaitamaSerioSystem = {
+  triggered: false,   // já disparou nesta partida?
+  active: false,      // mensagem a ser exibida neste momento
+  timer: 0,           // tempo restante da mensagem (ms)
+  _garou: null,
+  _saitama: null,
+
+  reset(){
+    this.triggered = false;
+    this.active = false;
+    this.timer = 0;
+    this._garou = null;
+    this._saitama = null;
+    if(saitamaSerioMsg) saitamaSerioMsg.classList.remove('visible');
+  },
+
+  // Garou no máximo (Galáxia) e Saitama no máximo (Soco Adaptativo) em campo
+  check(){
+    if(this.triggered || this.active) return;
+    const garou = State.heroes.find(h => h.type === 'garou' && h.garouLevel >= 2 && h.alive !== false);
+    const saitama = State.heroes.find(h => h.type === 'saitama' && h.upgraded2 && !h.saitamaSerio);
+    if(garou && saitama){
+      this.triggered = true;
+      this.active = true;
+      this.timer = 5000;
+      this._garou = garou;
+      this._saitama = saitama;
+      if(saitamaSerioMsg) saitamaSerioMsg.classList.add('visible');
+    }
+  },
+
+  update(dt){
+    if(!this.active) return;
+    this.timer -= dt;
+    if(this.timer <= 0){
+      this.active = false;
+      if(saitamaSerioMsg) saitamaSerioMsg.classList.remove('visible');
+      this._resolve();
+    }
+  },
+
+  _resolve(){
+    const garou = this._garou, saitama = this._saitama;
+    // Remove o Garou do mapa — igual a uma venda, mas sem devolver dinheiro
+    if(garou && State.heroes.includes(garou)){
+      MurasakiRange.removeRing(garou);
+      if(garou.auraEl){ garou.auraEl.remove(); garou.auraEl = null; }
+      garou.el.remove();
+      const idx = State.heroes.indexOf(garou);
+      if(idx >= 0) State.heroes.splice(idx, 1);
+      if(State.selectedHero === garou) State.selectedHero = null;
+    }
+    // Saitama: dano = vida atual do inimigo (inclui chefes) · ataca a cada 1s
+    if(saitama){
+      saitama.saitamaSerio = true;
+      saitama.cooldown = 1000;
+      let badge = saitama.el.querySelector('.upgradeBadge');
+      if(badge){ badge.textContent = '★★★'; badge.title = 'Sério'; }
+    }
+    this._garou = null;
+    this._saitama = null;
+    CharBar.render();
+    Panel.render();
+  },
+};
+
+/* ============================================================
    MÓDULO: CharBar — barra de seleção de personagens (em baixo)
    ============================================================ */
 const CharBar = {
@@ -9802,10 +10681,24 @@ const Shop = {
   build(){
     shopCoinsVal.textContent = Save.coins();
     shopGrid.innerHTML = '';
-    // Lista todos os personagens com preço na loja, mais a Kailany só na conta eavs
-    const ids = Object.keys(ShopPrices);
-    if(Save.isUnlocked('kailany')) ids.push('kailany');
-    ids.forEach(id => {
+    // Lista todos os personagens com preço na loja, mais a Kailany só na conta eavs.
+    // Agrupados por anime (mesma lógica do Inventário): personagens do mesmo
+    // anime ficam lado a lado; sem-anime vão todos para o fim. Dentro de cada
+    // grupo, mantém a ordem original do ROSTER.
+    const visible = ROSTER.filter(r => (ShopPrices[r.id] !== undefined) || (r.id === 'kailany' && Save.isUnlocked('kailany')));
+    const groups = new Map();   // anime (ou null) -> [entries]
+    visible.forEach(r => {
+      const anime = CharacterAnime[r.id] || null;
+      if(!groups.has(anime)) groups.set(anime, []);
+      groups.get(anime).push(r);
+    });
+    const animeKeys = [...groups.keys()].filter(k => k !== null);
+    const orderedRoster = [
+      ...animeKeys.flatMap(k => groups.get(k)),
+      ...(groups.get(null) || []),
+    ];
+    orderedRoster.forEach(r => {
+      const id = r.id;
       const ch = Characters[id];
       if(!ch) return;
       const unlocked = Save.isUnlocked(id);
@@ -9975,38 +10868,51 @@ const SpearSystem = {
    ============================================================ */
 const EnemySystem = {
   // Vida de um inimigo normal num dado round (regra exata definida)
+  // Fórmula LINEAR original dos mapas infinitos (sem a duplicação do round
+  // 150+) — extraída à parte para servir de base ao cálculo exponencial.
+  _infiniteBaseHp(r){
+    // Mapa Zozo:
+    if(r <= 15) {
+      if(r <= 4) return 20 + (r-1)*5;
+      if(r <= 9) return 50 + (r-5)*5;
+      return 100 + Math.max(0, (r-10))*2;
+    }
+    // rounds 16-20: progressão suave até ao boss do 20
+    if(r <= 20){
+      const effectiveR = r;
+      return 100 + Math.max(0, (effectiveR - 15)) * 5;
+    }
+    // rounds 21+: inimigos com 200HP base +5 por round acima do 21
+    // rounds 61-70: inimigos com 500HP base +10 por round acima do 61 (chefe especial no 70)
+    // rounds 71-79: 700HP base +10/round | 81-89: 850HP +10/round
+    // 91-99: 1000HP +20/round
+    // 101+: no mapa Represa, 5000HP base +500 por round; nos restantes
+    // mapas infinitos (Zozo), mantém a progressão original (1500 +100/round).
+    if(r >= 101){
+      if(State.map.bg === 'represa' || State.map.bg === 'litoral' || State.map.bg === 'trindade') return 5000 + (r - 101) * 500;
+      return 1500 + (r - 101) * 100;
+    }
+    if(r >= 91)  return 1000 + (r - 91) * 20;
+    if(r >= 81)  return 850 + (r - 81) * 10;
+    if(r >= 71)  return 700 + (r - 71) * 10;
+    if(r >= 61) return 500 + Math.max(0, (r - 61)) * 10;
+    return 200 + Math.max(0, (r - 21)) * 5;
+  },
   hpForRound(r){
     if(State.map && State.map.bg === 'caca' && r <= 20){
       const cfg = CacaRounds[r];
       return (cfg && cfg.hp) || 50;
     }
     if(State.map && State.map.infinite){
-      // Mapa Zozo:
-      if(r <= 15) {
-        if(r <= 4) return 20 + (r-1)*5;
-        if(r <= 9) return 50 + (r-5)*5;
-        return 100 + Math.max(0, (r-10))*2;
+      // A PARTIR DO ROUND 150 (em TODOS os mapas infinitos, incl. Dia da
+      // Caça acima do round 20): a vida dos inimigos DUPLICA a cada round,
+      // usando como base o valor (linear) que o round 149 teria.
+      // Ex.: round149=X -> round150=X*2 -> round151=X*4 -> round152=X*8 ...
+      if(r >= 150){
+        const base149 = this._infiniteBaseHp(149);
+        return Math.round(base149 * Math.pow(2, r - 149));
       }
-      // rounds 16-20: progressão suave até ao boss do 20
-      if(r <= 20){
-        const effectiveR = r;
-        return 100 + Math.max(0, (effectiveR - 15)) * 5;
-      }
-      // rounds 21+: inimigos com 200HP base +5 por round acima do 21
-      // rounds 61-70: inimigos com 500HP base +10 por round acima do 61 (chefe especial no 70)
-      // rounds 71-79: 700HP base +10/round | 81-89: 850HP +10/round
-      // 91-99: 1000HP +20/round
-      // 101+: no mapa Represa, 5000HP base +500 por round; nos restantes
-      // mapas infinitos (Zozo), mantém a progressão original (1500 +100/round).
-      if(r >= 101){
-        if(State.map.bg === 'represa' || State.map.bg === 'litoral' || State.map.bg === 'trindade') return 5000 + (r - 101) * 500;
-        return 1500 + (r - 101) * 100;
-      }
-      if(r >= 91)  return 1000 + (r - 91) * 20;
-      if(r >= 81)  return 850 + (r - 81) * 10;
-      if(r >= 71)  return 700 + (r - 71) * 10;
-      if(r >= 61) return 500 + Math.max(0, (r - 61)) * 10;
-      return 200 + Math.max(0, (r - 21)) * 5;
+      return this._infiniteBaseHp(r);
     }
     if(r <= 4) return 20 + (r-1)*5;          // r1=20, r2=25, r3=30, r4=35
     if(r <= 9) return 50 + (r-5)*5;          // r5=50 ... r9=70
@@ -10901,10 +11807,14 @@ const RoundSystem = {
     if(State._testMapNoReward) return;  // no mapa teste especial não há bónus
     if(State.map && State.map.bg === 'caca'){
       Money.addShared(100);   // "Dia da Caça": sempre 100 de dinheiro por round concluído
-      // Recompensa extra de moedas da loja no modo Infinito (rounds 50/100 e além)
+      // Recompensa extra de moedas da loja no modo Infinito (rounds 50/100 e além).
+      // Acima do round 100: apenas 5 moedas por round; a partir do round 150,
+      // esse valor dobra (10 moedas por round), acompanhando a mesma regra
+      // dos demais mapas infinitos.
       if(r === 50) Save.addCoins(75);
       else if(r === 100) Save.addCoins(150);
-      else if(r > 100) Save.addCoins(50);
+      else if(r >= 150) Save.addCoins(10);
+      else if(r > 100) Save.addCoins(5);
       return;
     }
     const passesTen = (State.map && State.map.infinite) || State.totalRounds > 10;
@@ -10914,16 +11824,20 @@ const RoundSystem = {
     const isTrindade = State.map && State.map.bg === 'trindade';
     Money.addShared(isTrindade ? bonus * 2 : bonus);   // Trindade: dinheiro por round em dobro
 
-    // Recompensa de moedas da loja por passar os rounds 50/100 nos mapas infinitos
+    // Recompensa de moedas da loja por passar os rounds 50/100 nos mapas infinitos.
+    // A partir do round 150, as moedas que se ganhava por passar do round 100
+    // (o valor "r > 100") dobram, em TODOS os mapas infinitos.
     if(State.map && State.map.infinite){
       if(State.map.bg === 'litoral'){
         if(r === 50) Save.addCoins(25);
         else if(r === 100) Save.addCoins(50);
+        else if(r >= 150) Save.addCoins(10);  // dobro do valor pós-100 (5 -> 10)
         else if(r > 100) Save.addCoins(5);   // moedas por round a partir do round 101
       }else if(isTrindade){
         // Trindade: moedas em dobro em relação ao mapa Represa
         if(r === 50) Save.addCoins(200);
         else if(r === 100) Save.addCoins(400);
+        else if(r >= 150) Save.addCoins(40);  // dobro do valor pós-100 (20 -> 40)
         else if(r > 100) Save.addCoins(20);   // moedas por round a partir do round 101
       }else{
         const isRepresa = State.map.bg === 'represa';
@@ -10931,10 +11845,12 @@ const RoundSystem = {
         if(isOnline){
           // Modo Online (mapa Represa): mesma recompensa de moedas para
           // os DOIS jogadores (anfitrião e quem entrou na sala) —
-          // 100 no round 50, 250 no round 100, 50 por round a partir do 101.
+          // 100 no round 50, 250 no round 100, 50 por round a partir do 101,
+          // dobrando (100) a partir do round 150.
           let mpCoins = 0;
           if(r === 50) mpCoins = 100;
           else if(r === 100) mpCoins = 250;
+          else if(r >= 150) mpCoins = 100;   // dobro do valor pós-100 (50 -> 100)
           else if(r > 100) mpCoins = 50;
           if(mpCoins > 0){
             Save.addCoins(mpCoins);              // moedas do anfitrião (neste dispositivo)
@@ -10943,6 +11859,7 @@ const RoundSystem = {
         }else{
           if(r === 50) Save.addCoins(isRepresa ? 100 : 50);
           else if(r === 100) Save.addCoins(isRepresa ? 200 : 100);
+          else if(r >= 150) Save.addCoins(isRepresa ? 20 : 10);  // dobro do valor pós-100
           else if(r > 100) Save.addCoins(isRepresa ? 10 : 5);   // moedas por round a partir do round 101
         }
       }
@@ -11243,6 +12160,7 @@ const Boss60System = {
         shirtless: h.shirtless,
         adaptive: h.adaptive,
         saitamaDmg: h.saitamaDmg,
+        saitamaSerio: !!h.saitamaSerio,
         dmgDealt: h.dmgDealt,
         invested: h.invested,
         arena: h.arena,
@@ -11305,6 +12223,16 @@ const Boss60System = {
         madaraLevel: h.madaraLevel || 0,
         jubiForm: !!h.jubiForm,
         obitoLevel: h.obitoLevel || 0,
+        kanekiLevel: h.kanekiLevel || 0,
+        kanekiWhiteHair: !!h.kanekiWhiteHair,
+        garouLevel: h.garouLevel || 0,
+        garouGalaxy: !!h.garouGalaxy,
+        garouMonster: !!h.garouMonster,
+        meruemLevel: h.meruemLevel || 0,
+        erenLevel: h.erenLevel || 0,
+        erenTitan: !!h.erenTitan,
+        erenSummonUses: h.erenSummonUses || 0,
+        _erenSummonGranted: !!h._erenSummonGranted,
         astaLevel: h.astaLevel || 0,
         yunoLevel: h.yunoLevel || 0,
         _yunoSpecialUsed: !!h._yunoSpecialUsed,
@@ -11383,6 +12311,8 @@ const Boss60System = {
       Money.set(5000);
       RoundSystem.reset();
       FusionSystem.reset();
+      SaitamaSerioSystem.reset();
+      ErenSummonSystem.reset();
       State.bossLeaked = false;
       kailanyMsg.classList.add('hidden');
 
@@ -11459,6 +12389,7 @@ const Boss60System = {
         dmgMult: s.dmgMult,
         adaptive: s.adaptive,
         saitamaDmg: s.saitamaDmg,
+        saitamaSerio: !!s.saitamaSerio,
         flatDmg: s.flatDmg,
         unrestricted: s.unrestricted,
         specialDmg: s.specialDmg,
@@ -11525,6 +12456,16 @@ const Boss60System = {
         madaraLevel: s.madaraLevel || 0,
         jubiForm: !!s.jubiForm,
         obitoLevel: s.obitoLevel || 0,
+        kanekiLevel: s.kanekiLevel || 0,
+        kanekiWhiteHair: !!s.kanekiWhiteHair,
+        garouLevel: s.garouLevel || 0,
+        garouGalaxy: !!s.garouGalaxy,
+        garouMonster: !!s.garouMonster,
+        meruemLevel: s.meruemLevel || 0,
+        erenLevel: s.erenLevel || 0,
+        erenTitan: !!s.erenTitan,
+        erenSummonUses: s.erenSummonUses || 0,
+        _erenSummonGranted: !!s._erenSummonGranted,
         astaLevel: s.astaLevel || 0,
         yunoLevel: s.yunoLevel || 0,
         _yunoSpecialUsed: !!s._yunoSpecialUsed,
@@ -11580,6 +12521,19 @@ const Boss60System = {
       // Julios (nível máximo): redesenha já com o cabelo preto
       if(hero.juliosBlackHair && hero.arena && el.getContext){
         ArenaArt.drawFighter(el.getContext('2d'), ch, 0, { juliosBlackHair: true });
+      }
+      // Kaneki (up1): redesenha já com o cabelo branco
+      if(hero.kanekiWhiteHair && hero.arena && el.getContext){
+        ArenaArt.drawFighter(el.getContext('2d'), ch, 0, { kanekiWhiteHair: true });
+      }
+      // Garou (Monstro/Galáxia): redesenha já totalmente preto ou azul escuro
+      if((hero.garouMonster || hero.garouGalaxy) && hero.arena && el.getContext){
+        ArenaArt.drawFighter(el.getContext('2d'), ch, 0, { garouMonster: !!hero.garouMonster, garouGalaxy: !!hero.garouGalaxy });
+      }
+      // Eren (Titã de Ataque/Fundador): redesenha já maior e com olhos verdes
+      if(hero.erenTitan && hero.arena){
+        el.classList.add('big-hero');
+        if(el.getContext) ArenaArt.drawFighter(el.getContext('2d'), ch, 0, { erenTitan: true });
       }
       // Muzan (Final): redesenha já sem camisa, cabelo branco e braços/pernas vermelhos
       if(hero.muzanFinal && hero.arena && el.getContext){
@@ -11642,6 +12596,7 @@ const Boss60System = {
       shirtless: h.shirtless,
       adaptive: h.adaptive,
       saitamaDmg: h.saitamaDmg,
+      saitamaSerio: !!h.saitamaSerio,
       dmgDealt: h.dmgDealt,
       invested: h.invested,
       arena: h.arena,
@@ -11704,6 +12659,16 @@ const Boss60System = {
       madaraLevel: h.madaraLevel || 0,
       jubiForm: !!h.jubiForm,
       obitoLevel: h.obitoLevel || 0,
+      kanekiLevel: h.kanekiLevel || 0,
+      kanekiWhiteHair: !!h.kanekiWhiteHair,
+      garouLevel: h.garouLevel || 0,
+      garouGalaxy: !!h.garouGalaxy,
+      garouMonster: !!h.garouMonster,
+      meruemLevel: h.meruemLevel || 0,
+      erenLevel: h.erenLevel || 0,
+      erenTitan: !!h.erenTitan,
+      erenSummonUses: h.erenSummonUses || 0,
+      _erenSummonGranted: !!h._erenSummonGranted,
       astaLevel: h.astaLevel || 0,
       yunoLevel: h.yunoLevel || 0,
       _yunoSpecialUsed: !!h._yunoSpecialUsed,
@@ -11770,6 +12735,8 @@ const Boss60System = {
       this._restoreHeroes(currentHeroData);
 
       FusionSystem.reset();
+      SaitamaSerioSystem.reset();
+      ErenSummonSystem.reset();
       endScreen.classList.add('hidden');
       startBtn.classList.add('hidden');
       prepHint.classList.add('hidden');
@@ -11924,6 +12891,8 @@ const GameSystem = {
     }
     RoundSystem.reset();
     FusionSystem.reset();   // limpa a oferta de fusão (1x/partida)
+    SaitamaSerioSystem.reset();  // limpa o evento "Sério" (1x/partida)
+    ErenSummonSystem.reset();    // remove chefes invocados pelo Eren (Fundador)
     State.bossLeaked = false;
     kailanyMsg.classList.add('hidden');
 
@@ -11982,7 +12951,27 @@ const GameSystem = {
     GojoSystem.update(dt);      // conta a duração da rajada do Gojo (up2)
     FusionSystem.check();      // pode oferecer a fusão (1x/partida)
     FusionSystem.update(dt);   // conta os 10s da oferta
+    SaitamaSerioSystem.check();     // Garou (Galáxia) + Saitama (Adaptativo) no máximo
+    SaitamaSerioSystem.update(dt);  // conta os 5s da mensagem
+    ErenSummonSystem.update(dt);    // move o(s) chefe(s) invocado(s) pelo Eren (Fundador)
     KailanySystem.update(dt);  // conta a mensagem (10s) e a vida do amor (50s)
+
+    // Atualiza o painel em tempo real quando o herói selecionado tem dano
+    // dependente da vida dos inimigos (Saitama adaptativo/Sério, Garou
+    // Galáxia, Mahoraga), para o número de dano nunca ficar desatualizado.
+    State._dmgPreviewTimer = (State._dmgPreviewTimer || 0) + dt;
+    if(State._dmgPreviewTimer >= 200){
+      State._dmgPreviewTimer = 0;
+      const sh = State.selectedHero;
+      if(sh && (
+        sh.saitamaSerio ||
+        (sh.adaptive && sh.type === 'saitama') ||
+        (sh.type === 'garou' && sh.garouGalaxy) ||
+        sh.isMahoraga
+      )){
+        Panel.render();
+      }
+    }
 
     // Multijogador: o anfitrião transmite periodicamente o estado partilhado
     if(typeof MP !== 'undefined' && MP.role === 'host') MP.hostTick(now);
@@ -12430,7 +13419,13 @@ const MP = {
     bar.className = 'hpbar';
     bar.innerHTML = '<i></i>';
     el.appendChild(bar);
+    // Define a posição inicial ANTES de entrar no DOM e só depois liga a
+    // transição (.netInterp): assim a 1ª colocação não desliza do canto,
+    // e todas as atualizações seguintes deslizam suavemente (ver CSS).
+    el.style.left = data.xPct + '%';
+    el.style.top  = data.yPct + '%';
     game.appendChild(el);
+    el.classList.add('netInterp');
     return Object.assign({}, data, { el, bar });
   },
   _updateEnemyEl(obj, data){
@@ -12474,6 +13469,10 @@ const MP = {
     urahara: { system: UraharaSystem, field: 'uraharaLevel' },
     madara: { system: MadaraSystem, field: 'madaraLevel' },
     obito: { system: ObitoSystem, field: 'obitoLevel' },
+    kaneki: { system: KanekiSystem, field: 'kanekiLevel' },
+    garou: { system: GarouSystem, field: 'garouLevel' },
+    meruem: { system: MeruemSystem, field: 'meruemLevel' },
+    eren: { system: ErenSystem, field: 'erenLevel' },
     asta: { system: AstaSystem, field: 'astaLevel' },
     yuno: { system: YunoSystem, field: 'yunoLevel' },
   },
@@ -12488,7 +13487,12 @@ const MP = {
       el = buildStick('hero');
       if(ch) el.style.color = ch.color;
     }
+    // Posição inicial antes de entrar no DOM (ver nota em _buildEnemyEl):
+    // evita que o herói deslize a partir do canto na 1ª fotografia.
+    el.style.left = data.xPct + '%';
+    el.style.top  = data.yPct + '%';
     game.appendChild(el);
+    el.classList.add('netInterp');
     const obj = Object.assign({}, data, { el });
     el.addEventListener('click', (ev) => {
       ev.stopPropagation();
