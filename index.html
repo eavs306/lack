@@ -970,6 +970,53 @@ body{
   background:var(--accent);color:#000;
 }
 .shopCard .buyBtn:disabled{background:#444;color:#888;cursor:not-allowed;}
+/* Botão de conquistas (medalha) no ecrã inicial: canto superior esquerdo */
+#achievementsBtn{
+  position:absolute;
+  top:20px;
+  left:24px;
+}
+/* ---------- ECRÃ DE CONQUISTAS ---------- */
+#achievementsGrid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill, 220px);
+  gap:12px;
+  max-width:92%;
+  max-height:66%;
+  overflow-y:auto;
+  padding:8px;
+  justify-content:center;
+}
+.achCard{
+  width:220px;
+  background:var(--panel);
+  border:2px solid #000;
+  border-radius:10px;
+  padding:14px 12px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:6px;
+  text-align:center;
+}
+.achCard.unlocked{border-color:var(--accent);}
+.achCard.claimed{border-color:var(--accent-2);}
+.achCard.locked{opacity:.55;}
+.achCard .achIcon{font-size:30px;line-height:1;filter:grayscale(1);}
+.achCard.unlocked .achIcon, .achCard.claimed .achIcon{filter:none;}
+.achCard .achName{font-weight:bold;font-size:15px;color:var(--ink);}
+.achCard .achMsg{font-size:12px;font-style:italic;color:var(--ink-dim);}
+.achCard .achHow{font-size:11px;color:var(--ink-dim);line-height:1.4;}
+.achCard .achReward{font-size:12px;font-weight:bold;color:var(--accent);}
+.achCard .achClaimBtn{
+  width:100%;padding:8px 4px;font-size:12px;font-weight:bold;
+  border:none;border-radius:6px;cursor:pointer;
+  background:var(--accent-2);color:#062;
+  margin-top:2px;
+}
+.achCard .achClaimBtn:hover{filter:brightness(1.1);}
+.achCard .achClaimedTag{font-size:12px;font-weight:bold;color:var(--danger);margin-top:2px;}
+.achCard .achLockedTag{font-size:11px;font-weight:bold;color:var(--ink-dim);margin-top:2px;}
 /* Botão START flutuante na fase de preparação */
 #startBtn{
   position:absolute;
@@ -1437,6 +1484,7 @@ body{
     <button class="btn" id="playBtn">▶ Jogar</button>
     <button class="btn ghost" id="shopBtn">🛒 Loja</button>
     <button class="btn ghost" id="roomCornerBtn">🚪 Sala</button>
+    <button class="btn ghost" id="achievementsBtn">🏅 Conquistas</button>
   </div>
 
   <!-- Ecrã de SALA (multijogador — por enquanto apenas visual, sem ligação real) -->
@@ -1475,6 +1523,13 @@ body{
       <button class="btn ghost small" id="importCodeBtn">📥 Importar progresso</button>
     </div>
     <button class="btn ghost" id="shopCloseBtn">Voltar</button>
+  </div>
+
+  <!-- Ecrã de CONQUISTAS -->
+  <div class="screen hidden" id="achievementsScreen">
+    <h1>🏅 Conquistas</h1>
+    <div id="achievementsGrid"></div>
+    <button class="btn ghost" id="achievementsCloseBtn">Voltar</button>
   </div>
 
   <!-- Ecrã de SELEÇÃO DE MAPA -->
@@ -1639,6 +1694,10 @@ const shopCoinsVal = $('#shopCoinsVal');
 const shopCloseBtn = $('#shopCloseBtn');
 const exportCodeBtn = $('#exportCodeBtn');
 const importCodeBtn = $('#importCodeBtn');
+const achievementsBtn = $('#achievementsBtn');
+const achievementsScreen = $('#achievementsScreen');
+const achievementsGrid = $('#achievementsGrid');
+const achievementsCloseBtn = $('#achievementsCloseBtn');
 const mapScreen   = $('#mapScreen');
 const cacaModeScreen   = $('#cacaModeScreen');
 const endScreen   = $('#endScreen');
@@ -2350,7 +2409,7 @@ const FREE_CHARACTERS = ['killua', 'peppa'];
    ============================================================ */
 const Save = {
   name: '',
-  data: null,   // { unlocked: [...], coins: N }
+  data: null,   // { unlocked: [...], coins: N, achieved: [...ids], claimed: [...ids] }
 
   _isEavs(){ return this.name.trim().toLowerCase() === 'eavs'; },
   _key(name){ return 'td_save_' + name.trim().toLowerCase(); },
@@ -2359,7 +2418,7 @@ const Save = {
   load(name){
     this.name = name;
     if(this._isEavs()){
-      this.data = { unlocked: [...FREE_CHARACTERS], coins: 0 };
+      this.data = { unlocked: [...FREE_CHARACTERS], coins: 0, achieved: [], claimed: [] };
       return this.data;
     }
     let loaded = null;
@@ -2370,13 +2429,16 @@ const Save = {
     if(loaded && Array.isArray(loaded.unlocked)){
       this.data = loaded;
     }else{
-      this.data = { unlocked: [...FREE_CHARACTERS], coins: 0 };
+      this.data = { unlocked: [...FREE_CHARACTERS], coins: 0, achieved: [], claimed: [] };
     }
     // Garante que os gratuitos estão sempre presentes
     FREE_CHARACTERS.forEach(id => {
       if(!this.data.unlocked.includes(id)) this.data.unlocked.push(id);
     });
     if(typeof this.data.coins !== 'number') this.data.coins = 0;
+    // Compatibilidade com perfis antigos (sem conquistas ainda gravadas)
+    if(!Array.isArray(this.data.achieved)) this.data.achieved = [];
+    if(!Array.isArray(this.data.claimed)) this.data.claimed = [];
     this._persist();
     return this.data;
   },
@@ -2415,6 +2477,34 @@ const Save = {
     this._persist();
   },
 
+  // ---------- CONQUISTAS ----------
+  // "Alcançada" = a condição foi cumprida (aparece com o botão de receber).
+  // "Resgatada" = o jogador já clicou para receber a recompensa em moedas.
+  hasAchieved(id){ this._ensureLoaded(); return this.data.achieved.includes(id); },
+  hasClaimed(id){ this._ensureLoaded(); return this.data.claimed.includes(id); },
+
+  // Marca uma conquista como alcançada (sem dar a recompensa ainda).
+  // Devolve true só na primeira vez (quando passa a estar desbloqueada).
+  markAchieved(id){
+    this._ensureLoaded();
+    if(this.data.achieved.includes(id)) return false;
+    this.data.achieved.push(id);
+    this._persist();
+    return true;
+  },
+
+  // Resgata a recompensa em moedas de uma conquista já alcançada.
+  // Devolve true se creditou as moedas (falha se ainda não alcançada ou já resgatada).
+  claimAchievement(id, reward){
+    this._ensureLoaded();
+    if(!this.data.achieved.includes(id)) return false;
+    if(this.data.claimed.includes(id)) return false;
+    this.data.claimed.push(id);
+    this.data.coins += reward;
+    this._persist();
+    return true;
+  },
+
   // Tenta comprar/desbloquear um personagem; devolve true se conseguiu
   buy(id){
     this._ensureLoaded();
@@ -2448,6 +2538,140 @@ const Save = {
       this._persist();
       return true;
     }catch(e){ return false; }
+  },
+};
+
+/* ============================================================
+   CONQUISTAS — lista fixa de conquistas do jogo.
+   Cada uma tem: nome, mensagem (frase temática), explicação de
+   como se consegue, recompensa em moedas da loja, e uma função
+   "check(bg, r, map)" chamada sempre que um round termina, onde
+   bg é o mapa atual (State.map.bg), r é o round que acabou de
+   terminar e map é o próprio State.map (para saber se é infinito).
+   ============================================================ */
+const AchievementDefs = [
+  {
+    id:'inicio',
+    name:'O início',
+    msg:'aprendendo o básico',
+    how:'Ganhar as 10 rounds no mapa Teste',
+    reward:5,
+    check:(bg, r, map) => bg === 'teste' && !map.infinite && r >= 10,
+  },
+  {
+    id:'baloes',
+    name:'Lembraste dos balões?',
+    msg:'nem foram necessários macacos',
+    how:'Ganhar as 15 rounds no mapa Jardim',
+    reward:10,
+    check:(bg, r, map) => bg === 'jardim' && !map.infinite && r >= 15,
+  },
+  {
+    id:'filho',
+    name:'O filho',
+    msg:'o início dos infinitos',
+    how:'Chegar ao round 50 no mapa Zozo',
+    reward:20,
+    check:(bg, r, map) => bg === 'piscina' && r >= 50,
+  },
+  {
+    id:'primeiro_desafio',
+    name:'O primeiro desafio',
+    msg:'o chefe sempre volta',
+    how:'Chegar ao round 100 no mapa Zozo',
+    reward:50,
+    check:(bg, r, map) => bg === 'piscina' && r >= 100,
+  },
+  {
+    id:'pele_ferro',
+    name:'Pele de ferro',
+    msg:'aguentaste bastante mas… logo neste mapa?',
+    how:'Chegar ao round 200 no mapa Zozo',
+    reward:100,
+    check:(bg, r, map) => bg === 'piscina' && r >= 200,
+  },
+  {
+    id:'demonstracao',
+    name:'A demonstração',
+    msg:'este gigante é mais forte que o outro',
+    how:'Chegar ao round 50 no mapa Represa',
+    reward:30,
+    check:(bg, r, map) => bg === 'represa' && r >= 50,
+  },
+  {
+    id:'visao',
+    name:'A visão',
+    msg:'um já é difícil mas dois em seguida piora',
+    how:'Chegar ao round 100 no mapa Represa',
+    reward:70,
+    check:(bg, r, map) => bg === 'represa' && r >= 100,
+  },
+];
+
+const Achievements = {
+  // Chamado sempre que um round termina (mapas infinitos e mapas finitos
+  // ao longo da partida). Marca como alcançadas as conquistas cuja
+  // condição já se cumpriu.
+  checkRound(r){
+    if(!State.map) return;
+    const bg = State.map.bg;
+    AchievementDefs.forEach(a => {
+      if(!Save.hasAchieved(a.id) && a.check(bg, r, State.map)) Save.markAchieved(a.id);
+    });
+  },
+
+  open(){
+    this.build();
+    achievementsScreen.classList.remove('hidden');
+  },
+  close(){
+    achievementsScreen.classList.add('hidden');
+  },
+  build(){
+    achievementsGrid.innerHTML = '';
+    AchievementDefs.forEach(a => {
+      const achieved = Save.hasAchieved(a.id);
+      const claimed = Save.hasClaimed(a.id);
+
+      const card = document.createElement('div');
+      card.className = 'achCard ' + (claimed ? 'claimed' : (achieved ? 'unlocked' : 'locked'));
+
+      const icon = document.createElement('div');
+      icon.className = 'achIcon'; icon.textContent = '🏅';
+
+      const name = document.createElement('div');
+      name.className = 'achName'; name.textContent = a.name;
+
+      const msg = document.createElement('div');
+      msg.className = 'achMsg'; msg.textContent = '"' + a.msg + '"';
+
+      const how = document.createElement('div');
+      how.className = 'achHow'; how.textContent = a.how;
+
+      const reward = document.createElement('div');
+      reward.className = 'achReward'; reward.textContent = `Recompensa: ${a.reward} 🪙`;
+
+      card.append(icon, name, msg, how, reward);
+
+      if(claimed){
+        const tag = document.createElement('div');
+        tag.className = 'achClaimedTag'; tag.textContent = 'Já resgatada';
+        card.appendChild(tag);
+      }else if(achieved){
+        const btn = document.createElement('button');
+        btn.className = 'achClaimBtn'; btn.textContent = 'Receber recompensa';
+        btn.addEventListener('click', () => {
+          if(Save.claimAchievement(a.id, a.reward)) this.build();
+        });
+        card.appendChild(btn);
+      }else{
+        const tag = document.createElement('div');
+        tag.className = 'achLockedTag'; tag.textContent = '🔒 Por alcançar';
+        card.appendChild(tag);
+      }
+
+      achievementsGrid.appendChild(card);
+    });
   },
 };
 
@@ -12365,6 +12589,7 @@ const RoundSystem = {
   // em qualquer mapa que passe do round 10. Caso contrário 100.
   _awardRoundBonus(r){
     if(State._testMapNoReward) return;  // no mapa teste especial não há bónus
+    Achievements.checkRound(r);   // verifica se alguma conquista foi alcançada neste round
     if(State.map && State.map.bg === 'caca'){
       Money.addShared(100);   // "Dia da Caça": sempre 100 de dinheiro por round concluído
       // Recompensa extra de moedas da loja no modo Infinito (rounds 50/100 e além).
@@ -13770,6 +13995,8 @@ try{
 // Loja
 shopBtn.addEventListener('click', () => Shop.open());
 shopCloseBtn.addEventListener('click', () => Shop.close());
+achievementsBtn.addEventListener('click', () => Achievements.open());
+achievementsCloseBtn.addEventListener('click', () => Achievements.close());
 
 /* ============================================================
    MÓDULO: MP — multijogador online (2 jogadores) via PeerJS
