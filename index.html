@@ -12688,14 +12688,23 @@ const Boss60System = {
       setTimeout(() => {
         boss60Text.classList.add('visible');
         // Após mais 2s: ir para o mapa teste - EXCETO no mapa Circo, onde
-        // nada mais acontece: o jogo fica parado nesta tela de "PARABÉNS"
-        // para sempre (sem fase-bónus, sem continuar rounds).
+        // a tela some e o jogo simplesmente continua no mesmo mapa (sem
+        // fase-bónus, sem trocar de mapa).
         setTimeout(() => {
-          if(this._originMapKey === 'circo') return;
+          if(this._originMapKey === 'circo'){ this._resumeSameMap(); return; }
           this._goToTestMap();
         }, 2000);
       }, 500);
     }, 2000);
+  },
+
+  // Usado apenas no mapa Circo: esconde a tela de "PARABÉNS" e retoma
+  // o jogo no mesmo mapa, sem trocar para nenhuma fase-bónus.
+  _resumeSameMap(){
+    boss60Overlay.classList.remove('visible');
+    boss60Circle.classList.remove('visible');
+    boss60Text.classList.remove('visible');
+    State.running = true;
   },
 
   // Guarda o estado atual do Zozo e lança o mapa Teste especial
