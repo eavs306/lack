@@ -12705,6 +12705,14 @@ const Boss60System = {
     boss60Circle.classList.remove('visible');
     boss60Text.classList.remove('visible');
     State.running = true;
+    // O loop principal (GameSystem.loop) só volta a agendar-se com
+    // requestAnimationFrame enquanto State.running é true; como ficou
+    // false durante a tela de celebração, o loop já tinha parado de vez
+    // (o "return" no início de loop() não reagenda o próximo frame).
+    // Sem isto, o jogo fica "congelado" (nenhum inimigo nasce e nenhum
+    // round avança) depois do round 60 no mapa Circo.
+    State.lastTime = performance.now();
+    requestAnimationFrame(GameSystem.loop);
   },
 
   // Guarda o estado atual do Zozo e lança o mapa Teste especial
@@ -14301,6 +14309,34 @@ window.addEventListener('keydown', (e) => {
       GameSystem.start();        // START visível => começar
     }else{
       GameSystem.toggleSpeed();  // em jogo => alternar velocidade
+    }
+  }
+});
+
+/* ---------- Código de cheat "eavs" ----------
+   Durante uma partida em andamento, se o jogador digitar as letras
+   "eavs" (em qualquer caixa de texto que não seja um campo de input),
+   ganha 100000 moedas da loja + 100000 de dinheiro na partida atual.
+   Pode ser usado várias vezes na mesma partida — cada vez que a
+   sequência "eavs" for completada, o buffer reinicia, permitindo
+   repetir o cheat digitando "eavs" de novo. */
+let _cheatBuffer = '';
+window.addEventListener('keydown', (e) => {
+  // Ignora teclas digitadas em campos de texto (nome do jogador, código
+  // de sala, etc.) para não interferir com a digitação normal.
+  const tag = (e.target && e.target.tagName) || '';
+  if(tag === 'INPUT' || tag === 'TEXTAREA') return;
+  // Só conta teclas de uma letra/caractere (ignora Shift, Ctrl, setas...).
+  if(!e.key || e.key.length !== 1) return;
+
+  _cheatBuffer += e.key.toLowerCase();
+  if(_cheatBuffer.length > 4) _cheatBuffer = _cheatBuffer.slice(-4);
+
+  if(_cheatBuffer === 'eavs'){
+    _cheatBuffer = '';   // reinicia já, para permitir usar de novo
+    if(State.running){
+      Save.addCoins(100000);     // moedas da loja (persistentes)
+      Money.addShared(100000);   // dinheiro da partida atual
     }
   }
 });
